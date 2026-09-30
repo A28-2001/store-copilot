@@ -9,21 +9,34 @@ import hashlib
 import html
 import json
 import re
+import sys
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from copilot import charts, config, dashboard, templates
-from copilot.db import QueryError, QueryRejected, StoreDB, guard_sql
-from copilot.engine import STEP_LABELS, Answer, Copilot
-from copilot.llm import PRIMARY_MODEL, check_key, make_llm, resolve_key
-from data.generate import ensure_db
+ROOT = Path(__file__).resolve().parent
+# Fingerprint of the code, docs and config. A redeploy can update the files while the server process
+# keeps running with the old modules in memory, so when the fingerprint changes we drop our own
+# modules and import them fresh, and every cache key includes it too.
+CODE_VERSION = hashlib.sha256(b"".join(
+    f.read_bytes() for f in sorted([*ROOT.glob("copilot/*.py"), *ROOT.glob("data/*.py"), *ROOT.glob("docs/**/*.md"),
+                                    ROOT / "config" / "stores.yaml"]))).hexdigest()[:12]
+if "copilot" in sys.modules and getattr(sys.modules["copilot"], "__code_version__", None) != CODE_VERSION:
+    for _name in [m for m in sys.modules if m.split(".")[0] in ("copilot", "data", "catalog")]:
+        del sys.modules[_name]
 
+import copilot as copilot_pkg  # noqa: E402
+from copilot import charts, config, dashboard, templates  # noqa: E402
+from copilot.db import QueryError, QueryRejected, StoreDB, guard_sql  # noqa: E402
+from copilot.engine import STEP_LABELS, Answer, Copilot  # noqa: E402
+from copilot.llm import PRIMARY_MODEL, check_key, make_llm, resolve_key  # noqa: E402
+from data.generate import ensure_db  # noqa: E402
+
+copilot_pkg.__code_version__ = CODE_VERSION
 st.set_page_config(page_title="Store Copilot", page_icon="🌿", layout="wide", initial_sidebar_state="auto")
 ensure_db()
 
-ROOT = Path(__file__).resolve().parent
 TABS = ["Overview", "Ask the Copilot", "Master data", "How it works"]
 YARDSTICK_URL = "https://a28-2001.github.io/yardstick/"
 
@@ -165,7 +178,7 @@ def key_fingerprint(key: str | None) -> str | None:
 
 
 @st.cache_resource(show_spinner=False)
-def get_copilot(allowed: tuple[str, ...], key_fp: str | None, _key: str | None) -> Copilot:
+def get_copilot(allowed: tuple[str, ...], key_fp: str | None, _key: str | None, version: str = CODE_VERSION) -> Copilot:
     """One Copilot per role and key. The key itself is not part of the cache key, only its hash."""
     return Copilot(list(allowed), llm=make_llm(_key) if _key else None)
 
@@ -176,12 +189,12 @@ def key_status(key_fp: str, _key: str) -> tuple[bool, str]:
 
 
 @st.cache_data(show_spinner=False)
-def load_overview(scope: tuple[str, ...]) -> dict:
+def load_overview(scope: tuple[str, ...], version: str = CODE_VERSION) -> dict:
     return dashboard.overview(list(scope))
 
 
 @st.cache_data(show_spinner=False)
-def load_detail(scope: tuple[str, ...], sql: str) -> pd.DataFrame:
+def load_detail(scope: tuple[str, ...], sql: str, version: str = CODE_VERSION) -> pd.DataFrame:
     return StoreDB(list(scope)).run(sql).df
 
 
@@ -235,7 +248,7 @@ with st.sidebar:
                 "multi-store clean-label grocer. Not affiliated with any company; no real sales, prices or "
                 "policies. Policy documents are illustrative.</div>", unsafe_allow_html=True)
 
-copilot = get_copilot(tuple(allowed), key_fingerprint(key) if llm_on else None, key if llm_on else None)
+copilot = get_copilot(tuple(allowed), key_fingerprint(key) if llm_on else None, key if llm_on else None, CODE_VERSION)
 history_key = f"history::{','.join(allowed)}::{'llm' if llm_on else 'demo'}"
 st.session_state.setdefault(history_key, [])
 st.session_state.setdefault("nav", TABS[0])
@@ -257,7 +270,7 @@ tabs = st.tabs(TABS, key="nav", on_change="rerun")
 
 # --------------------------------------------------------------------------- overview
 with tabs[0]:
-    panels = load_overview(tuple(view))
+    panels = load_overview(tuple(view), CODE_VERSION)
     cards = dashboard.kpis(panels)
     for row in range(0, len(cards), 3):
         cols = st.columns(3)
@@ -410,7 +423,7 @@ def panel_header(title: str, panel: dashboard.Panel, sub: str = "") -> None:
 
 
 with tabs[2]:
-    panels = load_overview(tuple(view))
+    panels = load_overview(tuple(view), CODE_VERSION)
     audit = panels["master_data_audit"]
     panel_header("Master data audit", audit, "9 checks from the Item Setup and Master Data SOP")
     if not audit.df.empty:
@@ -436,10 +449,10 @@ with tabs[2]:
         d1, d2 = st.columns(2)
         with d1.expander("Unmapped codes with sales"):
             st.caption("Detail list (not independently checked).")
-            show_table(load_detail(tuple(view), UNMAPPED_SQL))
+            show_table(load_detail(tuple(view), UNMAPPED_SQL, CODE_VERSION))
         with d2.expander("Products with two POS codes"):
             st.caption("Detail list (not independently checked).")
-            show_table(load_detail(tuple(view), DUPLICATE_SQL))
+            show_table(load_detail(tuple(view), DUPLICATE_SQL, CODE_VERSION))
 
     st.divider()
     clean = panels["clean_standard"]
