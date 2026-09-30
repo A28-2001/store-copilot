@@ -1,16 +1,43 @@
 # Store Copilot
 
-**Ask a multi-store grocer's numbers and policies in plain English. Get back a checked number, or the policy section it came from.**
+**A grocery store manager asks a question in plain English and gets back a number that has been double-checked, or the exact policy it came from.**
 
-LangChain + LangGraph · text-to-SQL with an independent verifier · BM25 retrieval over SOPs and vendor agreements · per-store access control enforced in code · runs free, with or without an API key.
-
-**Live demo:** [store-copilot-demo.streamlit.app](https://store-copilot-demo.streamlit.app/) &nbsp;·&nbsp; **Run it locally:** [2 commands](#run-it-locally)
-
-> **All data is synthetic.** This is an application project modelled on a multi-store clean-label grocer. It is not affiliated with any company and contains no real sales, prices or policies. The policy documents are illustrative.
+**[▶ Open the live demo](https://store-copilot-demo.streamlit.app/)** &nbsp;·&nbsp; [2-minute tour](#a-2-minute-tour) &nbsp;·&nbsp; [Skills](#skills-this-project-demonstrates) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
 
 ![Overview: verified KPI tiles and a "what needs attention" brief](docs_assets/overview.png)
 
-## What it does
+<sub>All data is synthetic. An application project modelled on a multi-store clean-label grocer; not affiliated with any company. Policy documents are illustrative.</sub>
+
+## Why it matters
+
+- **It catches master data problems before they cost money:** prices keyed below cost, vendor cost increases nobody repriced, items set up without a cost, POS codes that don't map, and app prices that drifted from the POS.
+- **Every number is checked before it's shown.** A second, independently written query must agree before an answer is labelled Verified. If it doesn't, the answer says so.
+- **Policies are quoted, not paraphrased.** SOPs and vendor agreements come back with the section cited.
+- **It's safe to hand to store managers.** It can't change data, and each manager sees only their own store.
+
+## Skills this project demonstrates
+
+| Skill | Where to see it |
+|---|---|
+| POS master data: SKUs, costs, prices, vendor records | [Master data audit](#master-data-the-analysts-weekly-audit): 9 checks, each tied to a written rule |
+| Keeping the POS and a mobile app catalog in sync | The "POS vs app catalog" check |
+| Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief |
+| SQL | 16 question queries, each with an independent check query ([`templates.py`](copilot/templates.py)) |
+| Python and APIs | Data generator, engine, Groq API, 51 automated tests |
+| Dashboards | Streamlit app, Plotly charts, a colorblind-checked palette |
+| AI tools in real workflows | LangChain + LangGraph, retrieval over documents (RAG), built with Claude Code |
+| Data quality and honest measurement | [The verifier](#the-verifier), a 40-question evaluation with every miss reported |
+| Data access and safety | Read-only, per-store access enforced in code ([`db.py`](copilot/db.py)) |
+
+## A 2-minute tour
+
+1. Open the [live demo](https://store-copilot-demo.streamlit.app/). On the Overview, click any card under **What needs attention**. It opens the full answer, with the data, the SQL and the checks behind it.
+2. Open the **Master data** tab for the 9-check audit.
+3. In **Ask the Copilot**, press **Item setup rules** for an answer quoted from a policy, with its citation.
+4. In the sidebar, switch to **Store manager** and type "How did the flagship do?". It refuses: that store is outside your access.
+5. In **How it works**, press **Try to break it** to see which safety layer stops each attack.
+
+## Examples
 
 A store manager types a question. The Copilot decides whether it needs **numbers**, **documents**, **both**, or a polite **no**:
 
@@ -193,3 +220,7 @@ tests/                 pytest suite
 - The spec named `llama-3.3-70b-versatile` with an `llama-3.1-8b-instant` fallback. Groq retired both in 2026 (they return `404 model_not_found`), so it's `openai/gpt-oss-120b` with an `openai/gpt-oss-20b` fallback. Both can be overridden with the `COPILOT_PRIMARY_MODEL` and `COPILOT_FALLBACK_MODEL` env vars.
 - Missing indexes turn 0.1 s queries into timeouts. A late one (`sku_map(store_id, master_sku_id)`) cut the slowest check query from about 180 ms to about 50 ms.
 - The chart palette was checked with a colorblind-safety validator. The first earthy palette failed (sage next to terracotta is nearly identical for red-green colorblind viewers), so the stores use green, blue and ochre, and terracotta is kept for warnings.
+
+---
+
+Built by [Aakash Mehta](https://mehtaakash.com) · [LinkedIn](https://www.linkedin.com/in/aakash-mehta28) · [GitHub](https://github.com/A28-2001)
