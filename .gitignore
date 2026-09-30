@@ -7,6 +7,8 @@ __pycache__/
 # Built on first run by data/generate.py
 data/store.db
 data/store.db-*
+data/*.lock
+data/.*.tmp
 
 # Secrets never go in git
 .env

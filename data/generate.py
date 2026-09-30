@@ -10,9 +10,12 @@ Run:  python data/generate.py            (seed 7, reproducible)
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -537,11 +540,44 @@ def print_summary(s: dict) -> None:
     print(f"  clean standard: {s['clean']}; velocity calibration x{s['velocity_calibration']:.3f}")
 
 
+_BUILD_LOCK = threading.Lock()
+
+
+@contextmanager
+def _file_lock(path: Path):
+    """Cross-process lock (POSIX). On a hosted app, two first visits can arrive at once."""
+    try:
+        import fcntl
+    except ImportError:  # Windows: the thread lock alone still covers a single process
+        yield
+        return
+    with open(path, "w") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def ensure_db(db_path: Path = DB_PATH) -> Path:
-    """Build the database on first run (it is git-ignored)."""
-    if not Path(db_path).exists():
-        generate(db_path=db_path, verbose=False)
-    return Path(db_path)
+    """Build the database on first run (it is git-ignored).
+
+    Only one build runs at a time, and it writes to a temporary file that is swapped
+    into place in one step, so no session ever opens a half-built database.
+    """
+    db_path = Path(db_path)
+    if db_path.exists():
+        return db_path
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with _BUILD_LOCK, _file_lock(db_path.with_name(db_path.name + ".lock")):
+        if not db_path.exists():  # someone else may have finished while we waited
+            tmp = db_path.with_name(f".{db_path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+            try:
+                generate(db_path=tmp, verbose=False)
+                os.replace(tmp, db_path)
+            finally:
+                tmp.unlink(missing_ok=True)
+    return db_path
 
 
 if __name__ == "__main__":
