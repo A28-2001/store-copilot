@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sqlite3
 import sys
 import threading
@@ -559,6 +560,24 @@ def _file_lock(path: Path):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+EXPECTED_TABLES = set(re.findall(r"CREATE TABLE (\w+)", SCHEMA)) | {"sku_velocity_14d"}
+
+
+def _is_complete(db_path: Path) -> bool:
+    """True if the file has every table and view and some sales (a half-built file does not)."""
+    if not db_path.exists():
+        return False
+    try:
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")}
+            return EXPECTED_TABLES <= names and con.execute("SELECT COUNT(*) FROM sales_daily").fetchone()[0] > 0
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return False
+
+
 def ensure_db(db_path: Path = DB_PATH) -> Path:
     """Build the database on first run (it is git-ignored).
 
@@ -566,11 +585,11 @@ def ensure_db(db_path: Path = DB_PATH) -> Path:
     into place in one step, so no session ever opens a half-built database.
     """
     db_path = Path(db_path)
-    if db_path.exists():
+    if _is_complete(db_path):
         return db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with _BUILD_LOCK, _file_lock(db_path.with_name(db_path.name + ".lock")):
-        if not db_path.exists():  # someone else may have finished while we waited
+        if not _is_complete(db_path):  # someone else may have finished while we waited
             tmp = db_path.with_name(f".{db_path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
             try:
                 generate(db_path=tmp, verbose=False)
