@@ -128,6 +128,8 @@ def test_off_topic_question_returns_no_document():
 
 
 # --------------------------------------------------------------------------- router + engine (demo mode, no key)
+from langchain_core.language_models.fake_chat_models import FakeListChatModel  # noqa: E402
+
 from copilot.engine import Copilot  # noqa: E402
 
 OWNER = Copilot(ALL_STORES)
@@ -168,6 +170,14 @@ def test_mixed_question_answers_numbers_and_cites_matching_vendor():
 
 def test_demo_mode_no_match_message():
     assert OWNER.ask("What's the weather like?").text.startswith("In demo mode I answer a fixed set of questions")
+
+
+def test_buttons_use_the_question_library_even_with_a_model():
+    """Suggestion buttons stay instant and verified: no LLM call even when a model is configured."""
+    copilot = Copilot(ALL_STORES, llm=FakeListChatModel(responses=["this should never be used"]))
+    answer = copilot.ask("Which prices fell under the margin floor?", use_llm=False)
+    assert answer.mode == "demo" and answer.template_id == "price_exceptions"
+    assert answer.verification.status == "verified"
 
 
 # --------------------------------------------------------------------------- LLM path with a fake model (no key)

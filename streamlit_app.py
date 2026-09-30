@@ -186,14 +186,14 @@ def load_detail(scope: tuple[str, ...], sql: str) -> pd.DataFrame:
 
 
 def go_ask(question: str) -> None:
-    st.session_state.pending = question
+    st.session_state.pending = (question, "button")
     st.session_state.nav = TABS[1]
 
 
 def pick_suggestion(widget_key: str) -> None:
     value = st.session_state.get(widget_key)
     if value:
-        st.session_state.pending = value
+        st.session_state.pending = (value, "button")
         st.session_state[widget_key] = None
 
 
@@ -368,12 +368,14 @@ with tabs[1]:
                  on_change=pick_suggestion, args=("pills_more",), label_visibility="collapsed")
     typed = st.chat_input("Ask about sales, stock, waste, vendors or policies…", key="chat")
     if typed:
-        st.session_state.pending = typed
+        st.session_state.pending = (typed, "typed")
 
     pending = st.session_state.pop("pending", None)
     if pending:
-        with st.status(f"“{pending}”", expanded=True) as status:
-            answer = copilot.ask(pending, stores=view,
+        question, source = pending
+        with st.status(f"“{question}”", expanded=True) as status:
+            # Buttons use the verified question library (instant); typed questions use the LLM when it's on.
+            answer = copilot.ask(question, stores=view, use_llm=(source == "typed"),
                                  on_step=lambda node: status.write(f"✓ {STEP_LABELS.get(node, node)}"))
             status.update(label=f"Answered in {answer.latency_ms / 1000:.1f}s", state="complete", expanded=False)
         st.session_state[history_key].insert(0, answer)

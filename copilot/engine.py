@@ -40,7 +40,8 @@ STEP_LABELS = {
     "answer_docs": "Read the matching passages", "compose": "Put the answer together", "refuse": "Declined the request",
 }
 MAX_SQL_ATTEMPTS = 2
-DEMO_NO_MATCH = "In demo mode I answer a fixed set of questions. Add a free Groq key to ask anything."
+DEMO_NO_MATCH = ("In demo mode I answer a fixed set of questions (see the suggestions). "
+                 "Turn on LLM mode with a free Groq key to ask anything.")
 WRITE_REFUSAL = ("I can only read data, so I can't change prices, inventory or records. Changes go through "
                  "the POS, with the approvals the Pricing and Margin Policy requires.")
 
@@ -136,6 +137,7 @@ class CopilotState(TypedDict, total=False):
     notes: Annotated[list[str], operator.add]
     trace: Annotated[list[str], operator.add]
     numbers_mode: str
+    use_llm: bool
     template_id: str | None
     prepared: Any
     sql: str | None
@@ -261,10 +263,15 @@ class Copilot:
         return "llm" if self.llm is not None else "demo"
 
     # -- public ----------------------------------------------------------------
-    def ask(self, question: str, stores: list[str] | None = None, on_step=None) -> Answer:
-        """Run the graph. `on_step(node_name)` is called as each node finishes (the app shows live progress)."""
+    def ask(self, question: str, stores: list[str] | None = None, on_step=None, use_llm: bool = True) -> Answer:
+        """Run the graph. `on_step(node_name)` is called as each node finishes (the app shows live progress).
+
+        use_llm=False answers from the built-in question library even when a model is available: the app does
+        this for its suggestion buttons, so they stay instant and verified, and saves the model for typed questions.
+        """
         t0 = time.perf_counter()
         inputs = {"question": question.strip(), "picker": stores or [], "notes": [], "trace": [], "attempts": 0,
+                  "use_llm": bool(use_llm and self.llm is not None),
                   "docs": []}
         state: dict = {}
         for mode, chunk in self.graph.stream(inputs, stream_mode=["updates", "values"]):
@@ -277,7 +284,7 @@ class Copilot:
         docs = state.get("docs") or []
         return Answer(
             question=question, route=state.get("route", "refuse"), text=state.get("answer", ""),
-            mode=self.mode if state.get("numbers_mode", self.mode) == self.mode else "demo",
+            mode="llm" if state.get("use_llm") and state.get("numbers_mode", "llm") == "llm" else "demo",
             scope=state.get("scope", []), notes=list(dict.fromkeys(state.get("notes", []))),
             sql=state.get("sql"), check_sql=state.get("check_sql"),
             data=result.df if result is not None else None, truncated=bool(result and result.truncated),
@@ -334,7 +341,7 @@ class Copilot:
     def _route(self, state: CopilotState) -> dict:
         question = state["question"]
         route, reason = None, "keywords"
-        if self.llm is not None:
+        if state.get("use_llm"):
             try:
                 raw = (ROUTER_PROMPT | self.llm | StrOutputParser()).invoke({"question": question})
                 word = next((w for w in re.findall(r"[a-z]+", raw.lower()) if w in ROUTES), None)
@@ -370,7 +377,7 @@ class Copilot:
         return "documents" if self.retriever.invoke(question) else "numbers"
 
     def _write_sql(self, state: CopilotState) -> dict:
-        if self.llm is not None and state.get("numbers_mode") != "demo":
+        if state.get("use_llm") and state.get("numbers_mode") != "demo":
             try:
                 return self._write_sql_llm(state)
             except Exception:
@@ -456,7 +463,7 @@ class Copilot:
 
     def _answer_docs(self, state: CopilotState) -> dict:
         docs = state.get("docs") or []
-        if self.llm is not None and docs:
+        if state.get("use_llm") and docs:
             try:
                 return {"docs_text": rag.llm_answer(state["question"], docs, self.llm), "trace": ["answer_docs"]}
             except Exception:

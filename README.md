@@ -4,7 +4,7 @@
 
 LangChain + LangGraph · text-to-SQL with an independent verifier · BM25 retrieval over SOPs and vendor agreements · per-store access control enforced in code · runs free, with or without an API key.
 
-**Live demo:** _coming soon_ &nbsp;·&nbsp; **Run it locally:** [2 commands](#run-it-locally)
+**Live demo:** [store-copilot-demo.streamlit.app](https://store-copilot-demo.streamlit.app/) &nbsp;·&nbsp; **Run it locally:** [2 commands](#run-it-locally)
 
 > **All data is synthetic.** This is an application project modelled on a multi-store clean-label grocer. It is not affiliated with any company and contains no real sales, prices or policies. The policy documents are illustrative.
 
@@ -163,10 +163,10 @@ The schema mirrors what a typical grocery POS can export: an item list (→ `sku
 pip install -r requirements.txt && streamlit run streamlit_app.py
 ```
 
-The database builds itself on first run (about a second). It runs in **demo mode** with no key. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
+The database builds itself on first run (about a second). It runs in **demo mode** with no key. With a key, the suggestion buttons still answer instantly from the verified question library, and typed questions go to the LLM. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
 
 ```bash
-pytest                                  # 50 tests, no key needed (the LLM path uses a fake model)
+pytest                                  # 51 tests, no key needed (the LLM path uses a fake model)
 python eval/run_eval.py --mode demo     # the 40-question evaluation
 python data/generate.py --seed 7        # rebuild the synthetic database
 ```
