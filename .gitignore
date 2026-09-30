@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+
+# Built on first run by data/generate.py
+data/store.db
+data/store.db-*
+
+# Secrets never go in git
+.env
+.streamlit/secrets.toml
+.claude/

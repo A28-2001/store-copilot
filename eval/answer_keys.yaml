@@ -1,0 +1,79 @@
+# Answer keys for the numbers half of the golden set, used to grade LLM mode.
+# Each question lists one or more acceptable readings; each reading is a SQL query returning ONE row.
+# Every value in that row must appear somewhere in the LLM's result table (numbers within 0.5% or 0.1,
+# text as a case-insensitive substring). Written from the question and the data, before regrading.
+# The templates stay the gold for demo mode; these keys exist because a template answers its own
+# question, which is not always exactly the golden phrasing (e.g. "Fail items" vs "Fail and Review").
+#
+# Readings marked ADDED AFTER REVIEW were added after reading the misses of the second LLM run by hand:
+# each was a valid answer the first version of these keys didn't allow. The README reports accuracy
+# with and without them.
+
+n01:  # running low = under 5 days of cover
+  - SELECT COUNT(*) FROM inventory_current i JOIN sku_velocity_14d v USING (store_id, master_sku_id) WHERE v.avg_daily_units > 0 AND i.on_hand < 5 * v.avg_daily_units
+n02:  # daily revenue per store, all days
+  - SELECT SUM(revenue) FROM sales_daily
+n03:  # stock-outs at the flagship
+  - SELECT COUNT(*) FROM inventory_current WHERE store_id = 'S1' AND on_hand = 0
+n04:
+  - SELECT COUNT(*), SUM(on_order > 0) FROM inventory_current WHERE on_hand = 0
+n05:  # last month = last 30 days, or calendar August
+  - SELECT (SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S1' AND sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S2' AND sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S3' AND sale_date > date('2026-09-28','-30 days'))
+  - SELECT (SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S1' AND sale_date LIKE '2026-08%'), (SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S2' AND sale_date LIKE '2026-08%'), (SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S3' AND sale_date LIKE '2026-08%')
+n06:  # this month = last 30 days, or month to date
+  - SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S2' AND sale_date > date('2026-09-28','-30 days')
+  - SELECT ROUND(SUM(revenue),2) FROM sales_daily WHERE store_id='S2' AND sale_date >= '2026-09-01'
+n07:  # the categories below target (the same three over 30 or 90 days)
+  - SELECT 'Meat & Seafood', 'Produce', 'Cafe & Hot Bar'
+n08:
+  - SELECT 'Meat & Seafood', 'Produce', 'Cafe & Hot Bar'
+n09:  # top SKU's gross margin, last 7 days
+  - SELECT MAX(gm) FROM (SELECT SUM(revenue - cogs) gm FROM sales_daily WHERE master_sku_id IS NOT NULL AND sale_date > date('2026-09-28','-7 days') GROUP BY master_sku_id)
+n10:  # most profitable product this week, by gross margin or by revenue
+  - SELECT m.product_name FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE s.sale_date > date('2026-09-28','-7 days') GROUP BY s.master_sku_id ORDER BY SUM(s.revenue - s.cogs) DESC LIMIT 1
+n11:  # how much thrown away: cost or units, 30 or 90 days
+  - SELECT ROUND(SUM(waste_cost),2) FROM waste_daily WHERE waste_date > date('2026-09-28','-30 days')
+  - SELECT ROUND(SUM(waste_cost),2) FROM waste_daily
+  - SELECT SUM(units) FROM waste_daily WHERE waste_date > date('2026-09-28','-30 days')
+  - SELECT SUM(units) FROM waste_daily
+n12:  # waste % by store (all three are over 3%), 30 or 90 days
+  - SELECT (SELECT ROUND(100.0*(SELECT SUM(w.waste_cost) FROM waste_daily w WHERE w.store_id='S1' AND w.waste_date > date('2026-09-28','-30 days'))/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.store_id='S1' AND s.sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(100.0*(SELECT SUM(w.waste_cost) FROM waste_daily w WHERE w.store_id='S2' AND w.waste_date > date('2026-09-28','-30 days'))/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.store_id='S2' AND s.sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(100.0*(SELECT SUM(w.waste_cost) FROM waste_daily w WHERE w.store_id='S3' AND w.waste_date > date('2026-09-28','-30 days'))/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.store_id='S3' AND s.sale_date > date('2026-09-28','-30 days'))
+  - SELECT (SELECT ROUND(100.0*(SELECT SUM(w.waste_cost) FROM waste_daily w WHERE w.store_id='S1')/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.store_id='S1'), (SELECT ROUND(100.0*(SELECT SUM(w.waste_cost) FROM waste_daily w WHERE w.store_id='S2')/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.store_id='S2'), (SELECT ROUND(100.0*(SELECT SUM(w.waste_cost) FROM waste_daily w WHERE w.store_id='S3')/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.store_id='S3')
+n13:  # banned = Fail; accept Fail + Review too
+  - SELECT COUNT(DISTINCT s.master_sku_id) FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE m.clean_standard_status = 'Fail' AND s.sale_date > date('2026-09-28','-7 days')
+  - SELECT COUNT(DISTINCT s.master_sku_id) FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE m.clean_standard_status <> 'Pass' AND s.sale_date > date('2026-09-28','-7 days')
+n14:  # Fail items still selling, or still in stock
+  - SELECT COUNT(DISTINCT s.master_sku_id) FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE m.clean_standard_status = 'Fail' AND s.sale_date > date('2026-09-28','-7 days')
+  - SELECT COUNT(DISTINCT i.master_sku_id) FROM inventory_current i JOIN sku_master m USING (master_sku_id) WHERE m.clean_standard_status = 'Fail' AND i.on_hand > 0
+  - SELECT COUNT(*) FROM inventory_current i JOIN sku_master m USING (master_sku_id) WHERE m.clean_standard_status = 'Fail' AND i.on_hand > 0  # ADDED AFTER REVIEW: store-level rows
+n15:  # products with two POS codes
+  - SELECT COUNT(*) FROM (SELECT store_id, master_sku_id FROM sku_map WHERE master_sku_id IS NOT NULL GROUP BY 1, 2 HAVING COUNT(*) > 1)
+n16:  # unmapped codes that rang up sales
+  - SELECT COUNT(DISTINCT store_id || local_sku) FROM sales_daily WHERE master_sku_id IS NULL
+n17:  # local share by store, 30 or 90 days
+  - SELECT (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S1' AND s.sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S2' AND s.sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S3' AND s.sale_date > date('2026-09-28','-30 days'))
+  - SELECT (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S1'), (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S2'), (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S3')
+  - SELECT (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s LEFT JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S1' AND s.sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s LEFT JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S2' AND s.sale_date > date('2026-09-28','-30 days')), (SELECT ROUND(100.0*SUM(CASE WHEN m.is_local_brand=1 THEN s.revenue END)/SUM(s.revenue),1) FROM sales_daily s LEFT JOIN sku_master m USING(master_sku_id) WHERE s.store_id='S3' AND s.sale_date > date('2026-09-28','-30 days'))  # ADDED AFTER REVIEW: share of ALL sales, as schema.py defines it
+n18:  # basket and member share, 30 or 90 days, overall or by store (flagship shown)
+  - SELECT ROUND(SUM(revenue)/SUM(transactions),2), ROUND(100.0*SUM(member_transactions)/SUM(transactions),1) FROM transactions_daily WHERE sale_date > date('2026-09-28','-30 days')
+  - SELECT ROUND(SUM(revenue)/SUM(transactions),2), ROUND(100.0*SUM(member_transactions)/SUM(transactions),1) FROM transactions_daily WHERE store_id='S1' AND sale_date > date('2026-09-28','-30 days')
+  - SELECT ROUND(SUM(revenue)/SUM(transactions),2), ROUND(100.0*SUM(member_transactions)/SUM(transactions),1) FROM transactions_daily
+  - SELECT ROUND(SUM(revenue)/SUM(transactions),2), ROUND(100.0*SUM(member_transactions)/SUM(transactions),1) FROM transactions_daily WHERE store_id='S1'
+  - SELECT ROUND(SUM(revenue)/SUM(transactions),2), SUM(member_transactions) FROM transactions_daily WHERE store_id='S1' AND sale_date > date('2026-09-28','-30 days')  # ADDED AFTER REVIEW: member count, the literal reading of 'how many'
+n19:  # the biggest flagship seller Store 3 doesn't carry, 30 or 90 days
+  - SELECT m.product_name FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE s.store_id='S1' AND s.sale_date > date('2026-09-28','-30 days') AND s.master_sku_id NOT IN (SELECT master_sku_id FROM sku_map WHERE store_id='S3' AND master_sku_id IS NOT NULL) GROUP BY 1 ORDER BY SUM(s.revenue) DESC LIMIT 1
+  - SELECT m.product_name FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE s.store_id='S1' AND s.master_sku_id NOT IN (SELECT master_sku_id FROM sku_map WHERE store_id='S3' AND master_sku_id IS NOT NULL) GROUP BY 1 ORDER BY SUM(s.revenue) DESC LIMIT 1
+n20:  # vendors to order from: store-vendor orders, or distinct vendors (excluding the in-house kitchen)
+  - SELECT COUNT(*) FROM (SELECT DISTINCT i.store_id, m.vendor_id FROM inventory_current i JOIN sku_velocity_14d v USING (store_id, master_sku_id) JOIN sku_master m USING (master_sku_id) WHERE v.avg_daily_units > 0 AND i.on_hand < 5 * v.avg_daily_units AND m.vendor_id <> 'V000')
+  - SELECT COUNT(DISTINCT m.vendor_id) FROM inventory_current i JOIN sku_velocity_14d v USING (store_id, master_sku_id) JOIN sku_master m USING (master_sku_id) WHERE v.avg_daily_units > 0 AND i.on_hand < 5 * v.avg_daily_units AND m.vendor_id <> 'V000'
+b01:
+  - SELECT COUNT(*) FROM (SELECT DISTINCT i.store_id, m.vendor_id FROM inventory_current i JOIN sku_velocity_14d v USING (store_id, master_sku_id) JOIN sku_master m USING (master_sku_id) WHERE v.avg_daily_units > 0 AND i.on_hand < 5 * v.avg_daily_units AND m.vendor_id <> 'V000')
+  - SELECT COUNT(DISTINCT m.vendor_id) FROM inventory_current i JOIN sku_velocity_14d v USING (store_id, master_sku_id) JOIN sku_master m USING (master_sku_id) WHERE v.avg_daily_units > 0 AND i.on_hand < 5 * v.avg_daily_units AND m.vendor_id <> 'V000'
+b02:
+  - SELECT ROUND(SUM(waste_cost),2) FROM waste_daily WHERE waste_date > date('2026-09-28','-30 days')
+  - SELECT ROUND(SUM(waste_cost),2) FROM waste_daily
+  - SELECT ROUND(100.0*(SELECT SUM(waste_cost) FROM waste_daily WHERE waste_date > date('2026-09-28','-30 days'))/SUM(s.cogs),1) FROM sales_daily s JOIN sku_master m USING(master_sku_id) WHERE m.perishable=1 AND s.sale_date > date('2026-09-28','-30 days')  # ADDED AFTER REVIEW: waste as a percent
+b03:
+  - SELECT COUNT(DISTINCT s.master_sku_id) FROM sales_daily s JOIN sku_master m USING (master_sku_id) WHERE m.clean_standard_status = 'Fail' AND s.sale_date > date('2026-09-28','-7 days')
+b04:
+  - SELECT COUNT(*) FROM sku_map WHERE store_id = 'S3' AND master_sku_id IS NULL

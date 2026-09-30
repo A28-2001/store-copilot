@@ -1,0 +1,57 @@
+# Stores are configuration, not code. Adding store 4 = one more entry here,
+# then `python data/generate.py` rebuilds the synthetic database.
+# All data is synthetic.
+
+data_end_date: 2026-09-28
+history_days: 90
+low_history_days: 30
+seed: 7
+
+# Calibration target for the flagship (average revenue per day over the window).
+flagship_revenue_per_day: 26000
+average_basket: 46.0
+
+stores:
+  - store_id: S1
+    name: Flagship
+    neighborhood: Downtown
+    open_date: 2026-04-15
+    size_factor: 1.00
+    assortment_share: 1.00
+    aliases: [flagship, downtown, s1, store 1, store one, first store, main store]
+
+  - store_id: S2
+    name: Store 2
+    neighborhood: Coconut Grove (hypothetical)
+    open_date: 2026-06-20
+    size_factor: 0.72
+    assortment_share: 0.85
+    aliases: [store 2, store two, s2, coconut grove, the grove, second store]
+
+  - store_id: S3
+    name: Store 3
+    neighborhood: Miami Beach (hypothetical)
+    open_date: 2026-09-10
+    size_factor: 0.55
+    assortment_share: 0.70
+    aliases: [store 3, store three, s3, miami beach, newest store, newest location, third store]
+
+# share = share of the 2,000 SKUs; velocity = base units/day per SKU at the flagship.
+categories:
+  - {name: Produce,            share: 0.14,  price_min: 2,  price_max: 9,  target_margin: 35, perishable: true,  base_velocity: 3.2}
+  - {name: Meat & Seafood,     share: 0.07,  price_min: 12, price_max: 70, target_margin: 28, perishable: true,  base_velocity: 1.1}
+  - {name: Dairy & Eggs,       share: 0.08,  price_min: 4,  price_max: 14, target_margin: 32, perishable: true,  base_velocity: 1.8}
+  - {name: Pantry,             share: 0.21,  price_min: 5,  price_max: 22, target_margin: 38, perishable: false, base_velocity: 0.9}
+  - {name: Snacks,             share: 0.13,  price_min: 4,  price_max: 12, target_margin: 40, perishable: false, base_velocity: 1.3}
+  - {name: Beverages & Juices, share: 0.11,  price_min: 4,  price_max: 16, target_margin: 45, perishable: true,  base_velocity: 2.2}
+  - {name: Cafe & Hot Bar,     share: 0.045, price_min: 12, price_max: 22, target_margin: 65, perishable: true,  base_velocity: 9.0}
+  - {name: Supplements,        share: 0.12,  price_min: 25, price_max: 85, target_margin: 48, perishable: false, base_velocity: 0.45}
+  - {name: Beauty & Body,      share: 0.095, price_min: 18, price_max: 95, target_margin: 55, perishable: false, base_velocity: 0.30}
+
+# Share of perishable unit sales that ends up as waste (Poisson rate).
+waste_rates:
+  Cafe & Hot Bar: 0.08
+  Produce: 0.06
+  Meat & Seafood: 0.03
+  Dairy & Eggs: 0.02
+  Beverages & Juices: 0.02

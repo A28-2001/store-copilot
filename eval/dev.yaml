@@ -1,0 +1,14 @@
+# Tuning set: different phrasings of the failure classes the first golden run exposed.
+# Keyword and stemming fixes were checked against THIS file, never against golden.yaml.
+- {question: "Chart sales per day by store", route: numbers, template: daily_trend}
+- {question: "Give me revenue day by day for the last month", route: numbers, template: daily_trend}
+- {question: "Is anything out at Store 2?", route: numbers, template: stockouts}
+- {question: "What items are we out of?", route: numbers, template: stockouts}
+- {question: "Which items earned the most margin dollars this week?", route: numbers, template: top_margin_skus}
+- {question: "How much food are we wasting at the flagship?", route: numbers, template: waste}
+- {question: "When do we mark down meat?", route: documents, section: Meat and seafood}
+- {question: "What must happen when an item fails its ingredient review?", route: documents, section: What each status means}
+- {question: "Who approves a store-specific price?", route: documents, section: One price across stores and the app}
+- {question: "How quickly do duplicate codes need to be merged at a new store?", route: documents, section: Unmapped and duplicate codes}
+- {question: "What should we do with juice that reached day 3?", route: documents, section: Cold-pressed juice}
+- {question: "How long is a new local brand's trial?", route: documents, section: New local brands}

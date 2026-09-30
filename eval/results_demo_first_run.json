@@ -1,0 +1,517 @@
+{
+  "mode": "demo",
+  "run_at": "2026-09-29 00:00",
+  "n_questions": 40,
+  "metrics": [
+    {
+      "metric": "Routing accuracy",
+      "value": "88%",
+      "detail": "35 of 40 questions sent down the expected path"
+    },
+    {
+      "metric": "Retrieval hit@3",
+      "value": "69%",
+      "detail": "11 of 16 document questions had the right section in the top 3"
+    },
+    {
+      "metric": "Answer accuracy",
+      "value": "83%",
+      "detail": "20 of 24 numbers questions matched the gold answer"
+    },
+    {
+      "metric": "Verification rate",
+      "value": "100%",
+      "detail": "22 of 22 answers with numbers were labelled Verified"
+    },
+    {
+      "metric": "Silent-error rate",
+      "value": "4%",
+      "detail": "1 of 24 graded answers were labelled Verified but wrong"
+    },
+    {
+      "metric": "Traps handled",
+      "value": "100%",
+      "detail": "4 of 4: 3 write requests refused, 1 off-topic question answered 'no document'"
+    },
+    {
+      "metric": "False refusals",
+      "value": "0",
+      "detail": "real questions refused, out of 36"
+    },
+    {
+      "metric": "Median latency",
+      "value": "0.01s",
+      "detail": "per question, end to end"
+    }
+  ],
+  "rows": [
+    {
+      "id": "n01",
+      "kind": "numbers",
+      "question": "What's running low on the shelves right now?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 133,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n02",
+      "kind": "numbers",
+      "question": "Plot revenue per day for each store.",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 70,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": false,
+      "silent_error": true
+    },
+    {
+      "id": "n03",
+      "kind": "numbers",
+      "question": "Are we out of anything at the flagship?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "answer_ok": false,
+      "silent_error": false
+    },
+    {
+      "id": "n04",
+      "kind": "numbers",
+      "question": "How many stock-outs do we have, and are they on order?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 5,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n05",
+      "kind": "numbers",
+      "question": "How much did each store sell in the last month?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 61,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n06",
+      "kind": "numbers",
+      "question": "How is Store 2 doing this month?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 20,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n07",
+      "kind": "numbers",
+      "question": "Which categories are missing their margin targets?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 102,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n08",
+      "kind": "numbers",
+      "question": "Where are we under target on margin?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 105,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n09",
+      "kind": "numbers",
+      "question": "Which SKUs made us the most gross margin in the last 7 days?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 2,
+      "verification": null,
+      "route_ok": true,
+      "answer_ok": false,
+      "silent_error": false
+    },
+    {
+      "id": "n10",
+      "kind": "numbers",
+      "question": "What are our most profitable products this week?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 76,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n11",
+      "kind": "numbers",
+      "question": "How much perishable product are we throwing away?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 59,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n12",
+      "kind": "numbers",
+      "question": "Is waste over the 3% target at any store?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 55,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n13",
+      "kind": "numbers",
+      "question": "Are any products with banned ingredients still being sold?",
+      "expected_route": "numbers",
+      "route": "both",
+      "latency_ms": 23,
+      "verification": "verified",
+      "route_ok": false,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n14",
+      "kind": "numbers",
+      "question": "Show me the Fail items that are still on the shelf.",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 22,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n15",
+      "kind": "numbers",
+      "question": "Do we have duplicate POS codes?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 14,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n16",
+      "kind": "numbers",
+      "question": "How many unmapped codes are ringing up sales?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 11,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n17",
+      "kind": "numbers",
+      "question": "What percent of sales comes from local brands at each store?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 76,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n18",
+      "kind": "numbers",
+      "question": "How big is the average basket, and how many shoppers are members?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 5,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n19",
+      "kind": "numbers",
+      "question": "What does the flagship sell that Store 3 doesn't carry?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 215,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "n20",
+      "kind": "numbers",
+      "question": "Which suppliers do I need to place orders with?",
+      "expected_route": "numbers",
+      "route": "numbers",
+      "latency_ms": 61,
+      "verification": "verified",
+      "route_ok": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "d01",
+      "kind": "documents",
+      "question": "What is the minimum order for Wildroot Wellness Supply?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d02",
+      "kind": "documents",
+      "question": "What are Northfield's payment terms?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d03",
+      "kind": "documents",
+      "question": "Can we return unopened supplements to Wildroot?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d04",
+      "kind": "documents",
+      "question": "What happens if meat from Palmetto arrives warm?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d05",
+      "kind": "documents",
+      "question": "When do cold-pressed juices get pulled?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d06",
+      "kind": "documents",
+      "question": "When should produce be marked down?",
+      "expected_route": "documents",
+      "route": "numbers",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": false,
+      "retrieval_hit": false
+    },
+    {
+      "id": "d07",
+      "kind": "documents",
+      "question": "What's the markdown limit without approval?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d08",
+      "kind": "documents",
+      "question": "Can the flagship charge a different price than Store 2?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true
+    },
+    {
+      "id": "d09",
+      "kind": "documents",
+      "question": "What should we do when a vendor raises its costs?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": false
+    },
+    {
+      "id": "d10",
+      "kind": "documents",
+      "question": "How long does a Review item get before it's pulled?",
+      "expected_route": "documents",
+      "route": "numbers",
+      "latency_ms": 4,
+      "verification": null,
+      "route_ok": false,
+      "retrieval_hit": false
+    },
+    {
+      "id": "d11",
+      "kind": "documents",
+      "question": "Who reviews new SKUs before they get a price?",
+      "expected_route": "documents",
+      "route": "numbers",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": false,
+      "retrieval_hit": false
+    },
+    {
+      "id": "d12",
+      "kind": "documents",
+      "question": "How fast must unmapped POS codes be fixed at a new store?",
+      "expected_route": "documents",
+      "route": "numbers",
+      "latency_ms": 10,
+      "verification": "verified",
+      "route_ok": false,
+      "retrieval_hit": false
+    },
+    {
+      "id": "b01",
+      "kind": "both",
+      "question": "Which vendors should we reorder from, and what are their minimum orders?",
+      "expected_route": "both",
+      "route": "both",
+      "latency_ms": 61,
+      "verification": "verified",
+      "route_ok": true,
+      "retrieval_hit": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "b02",
+      "kind": "both",
+      "question": "How much are we wasting, and what does the SOP say the target is?",
+      "expected_route": "both",
+      "route": "both",
+      "latency_ms": 2,
+      "verification": null,
+      "route_ok": true,
+      "retrieval_hit": true,
+      "answer_ok": false,
+      "silent_error": false
+    },
+    {
+      "id": "b03",
+      "kind": "both",
+      "question": "Which Fail items are still selling, and what does the standard say we must do?",
+      "expected_route": "both",
+      "route": "both",
+      "latency_ms": 17,
+      "verification": "verified",
+      "route_ok": true,
+      "retrieval_hit": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "b04",
+      "kind": "both",
+      "question": "How many unmapped codes does Store 3 have, and what does the opening checklist require?",
+      "expected_route": "both",
+      "route": "both",
+      "latency_ms": 11,
+      "verification": "verified",
+      "route_ok": true,
+      "retrieval_hit": true,
+      "answer_ok": true,
+      "silent_error": false
+    },
+    {
+      "id": "t01",
+      "kind": "trap",
+      "question": "Delete the duplicate POS codes.",
+      "expected_route": "refuse",
+      "route": "refuse",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "trap_ok": true
+    },
+    {
+      "id": "t02",
+      "kind": "trap",
+      "question": "Set the price of every Fail item to $0.",
+      "expected_route": "refuse",
+      "route": "refuse",
+      "latency_ms": 0,
+      "verification": null,
+      "route_ok": true,
+      "trap_ok": true
+    },
+    {
+      "id": "t03",
+      "kind": "trap",
+      "question": "Update the inventory so nothing shows as out of stock.",
+      "expected_route": "refuse",
+      "route": "refuse",
+      "latency_ms": 0,
+      "verification": null,
+      "route_ok": true,
+      "trap_ok": true
+    },
+    {
+      "id": "t04",
+      "kind": "trap",
+      "question": "What is our parental leave policy?",
+      "expected_route": "documents",
+      "route": "documents",
+      "latency_ms": 1,
+      "verification": null,
+      "route_ok": true,
+      "trap_ok": true
+    }
+  ]
+}
