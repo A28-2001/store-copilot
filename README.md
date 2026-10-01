@@ -2,7 +2,7 @@
 
 **A grocery store manager asks a question in plain English and gets back a number that has been double-checked, or the exact policy it came from.**
 
-**[▶ Open the live demo](https://store-copilot-demo.streamlit.app/)** &nbsp;·&nbsp; [2-minute tour](#a-2-minute-tour) &nbsp;·&nbsp; [Skills](#skills-this-project-demonstrates) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
+**[▶ Open the live demo](https://store-copilot-demo.streamlit.app/)** &nbsp;·&nbsp; [Planning model (Excel)](https://github.com/A28-2001/store-copilot/raw/main/planning/store_planning_model.xlsx) &nbsp;·&nbsp; [2-minute tour](#a-2-minute-tour) &nbsp;·&nbsp; [Skills](#skills-this-project-demonstrates) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
 
 ![Overview: verified KPI tiles and a "what needs attention" brief](docs_assets/overview.png)
 
@@ -22,8 +22,9 @@
 | POS master data: SKUs, costs, prices, vendor records | [Master data audit](#master-data-the-analysts-weekly-audit): 9 checks, each tied to a written rule |
 | Keeping the POS and a mobile app catalog in sync | The "POS vs app catalog" check |
 | Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief |
+| Excel financial modeling | [Planning model](#planning-model-excel): new store payback, a 3-year plan by channel, pricing and promotion tests, Base / Upside / Downside |
 | SQL | 16 question queries, each with an independent check query ([`templates.py`](copilot/templates.py)) |
-| Python and APIs | Data generator, engine, Groq API, 51 automated tests |
+| Python and APIs | Data generator, engine, Groq API, 55 automated tests |
 | Dashboards | Streamlit app, Plotly charts, a colorblind-checked palette |
 | AI tools in real workflows | LangChain + LangGraph, retrieval over documents (RAG), built with Claude Code |
 | Data quality and honest measurement | [The verifier](#the-verifier), a 40-question evaluation with every miss reported |
@@ -36,6 +37,7 @@
 3. In **Ask the Copilot**, press **Item setup rules** for an answer quoted from a policy, with its citation.
 4. In the sidebar, switch to **Store manager** and type "How did the flagship do?". It refuses: that store is outside your access.
 5. In **How it works**, press **Try to break it** to see which safety layer stops each attack.
+6. Download the **planning model** from the sidebar and switch the scenario on the Inputs sheet (cell C4) to Downside.
 
 ## Examples
 
@@ -71,6 +73,24 @@ Most wrong numbers in a grocery business start as wrong master data: a cost that
 ![The Master data tab: nine checks, each with its count and the rule it enforces](docs_assets/master_data.png)
 
 Each check is one line of SQL in [`copilot/templates.py`](copilot/templates.py), the whole audit is verified by an independently written query, and the rules come from an illustrative [Item Setup and Master Data SOP](docs/item_setup_master_data_sop.md) the Copilot can also quote.
+
+## Planning model (Excel)
+
+[`store_planning_model.xlsx`](https://github.com/A28-2001/store-copilot/raw/main/planning/store_planning_model.xlsx) turns the last 30 days of the same data into three planning questions:
+
+- **New Store:** what a new location costs, how fast it ramps, and when it pays back, month by month for five years, with a sensitivity grid.
+- **3-Year Plan:** revenue and EBITDA by channel (grocery, cafe and hot bar, catering, app orders, membership fees) as new stores open.
+- **Pricing:** pick a category and test a price change or a promotion. It shows the gross profit effect, the break-even unit change, and whether the discount is within the 30% markdown cap.
+
+| Scenario | New store payback | 2029 revenue | 2029 company EBITDA | Cash after new stores, 2027 to 2029 |
+|---|---|---|---|---|
+| Base | 48 months | $41.7M | $3.1M | ($0.2M) |
+| Upside | 27 months | $62.0M | $7.9M | $5.6M |
+| Downside | over 60 months | $25.6M | ($0.3M) | ($4.1M) |
+
+The Downside row is the useful one: if a new store ramps slowly, the plan should wait for the first store to prove itself before opening more.
+
+Sales, margins, waste and member activity come from the data; store sizes, labor, rent and build-out are assumptions, each with a note. Every number except the pasted actuals is a formula (1,274 of them). The actuals are tied out before they're written, 13 checks inside the workbook work key numbers out a second way, and [a test](tests/test_workbook.py) rebuilds the whole model in Python and matches it to the cent in all three scenarios. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
 
 ## Why numbers go to SQL and documents go to retrieval
 
@@ -179,6 +199,7 @@ How to read this honestly. Every mode was run twice, and **the second runs are o
 - **40 questions** catch regressions. They aren't a benchmark.
 - **Verified is not proven.** Two queries agreeing makes a silent error much less likely, not impossible: both can share the same wrong assumption.
 - **Not production.** There's no auth provider, no audit log and no live POS feed.
+- **The planning model's costs are assumptions.** Labor, rent, build-out and store sizes aren't in the data; the model shows how the decision changes as they move, not what they are.
 
 ## Connecting real data
 
@@ -193,9 +214,10 @@ pip install -r requirements.txt && streamlit run streamlit_app.py
 The database builds itself on first run (about a second). It runs in **demo mode** with no key. With a key, the suggestion buttons still answer instantly from the verified question library, and typed questions go to the LLM. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
 
 ```bash
-pytest                                  # 51 tests, no key needed (the LLM path uses a fake model)
+pytest                                  # 55 tests, no key needed (the LLM path uses a fake model)
 python eval/run_eval.py --mode demo     # the 40-question evaluation
 python data/generate.py --seed 7        # rebuild the synthetic database
+python planning/build_workbook.py       # rebuild the Excel model (Excel calculates it on open)
 ```
 
 ## Repo layout
@@ -211,6 +233,7 @@ copilot/rag.py         section chunking + BM25 BaseRetriever with version filter
 copilot/engine.py      the LangGraph: screen -> route -> numbers / documents / both / refuse
 copilot/llm.py         ChatGroq with fallback; key resolution and key check
 streamlit_app.py       the app
+planning/              the Excel planning model and the script that builds it
 eval/                  golden set, dev set, runner, results
 tests/                 pytest suite
 ```

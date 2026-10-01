@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
+PLAN_BOOK = ROOT / "planning" / "store_planning_model.xlsx"
 # Fingerprint of the code, docs and config. A redeploy can update the files while the server process
 # keeps running with the old modules in memory, so when the fingerprint changes we drop our own
 # modules and import them fresh, and every cache key includes it too.
@@ -242,6 +243,13 @@ with st.sidebar:
         st.markdown(pill("verified", f"LLM mode · {PRIMARY_MODEL.split('/')[-1]} on Groq"), unsafe_allow_html=True)
     else:
         st.markdown(pill("muted", "Demo mode · no key needed"), unsafe_allow_html=True)
+
+    if PLAN_BOOK.exists():
+        st.divider()
+        st.markdown("<div class='side-sub'><b>Planning model (Excel)</b><br>New store payback, a 3-year plan by "
+                    "channel, and pricing and promotion tests, built on this data.</div>", unsafe_allow_html=True)
+        st.download_button("Download the model", PLAN_BOOK.read_bytes(), file_name=PLAN_BOOK.name, key="plan_book",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     st.divider()
     st.markdown("<div class='disclaimer'><b>All data is synthetic.</b> A portfolio project modelled on a "
