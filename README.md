@@ -22,7 +22,7 @@
 | POS master data: SKUs, costs, prices, vendor records | [Master data audit](#master-data-the-analysts-weekly-audit): 9 checks, each tied to a written rule |
 | Keeping the POS and a mobile app catalog in sync | The "POS vs app catalog" check |
 | Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief |
-| Excel financial modeling | [Planning model](#planning-model-excel): new store payback, a 3-year plan by channel, pricing and promotion tests, Base / Upside / Downside |
+| Excel financial modeling | [Planning model](#planning-model-excel): new store payback, a 13-week cash forecast, inventory, pricing tests, Base / Upside / Downside |
 | SQL | 16 question queries, each with an independent check query ([`templates.py`](copilot/templates.py)) |
 | Python and APIs | Data generator, engine, Groq API, 55 automated tests |
 | Dashboards | Streamlit app, Plotly charts, a colorblind-checked palette |
@@ -37,7 +37,7 @@
 3. In **Ask the Copilot**, press **Item setup rules** for an answer quoted from a policy, with its citation.
 4. In the sidebar, switch to **Store manager** and type "How did the flagship do?". It refuses: that store is outside your access.
 5. In **How it works**, press **Try to break it** to see which safety layer stops each attack.
-6. Download the **planning model** from the sidebar and switch the scenario on the Inputs sheet (cell C4) to Downside.
+6. Download the **planning model** from the sidebar and switch the scenario on its Summary tab to Downside.
 
 ## Examples
 
@@ -53,7 +53,7 @@ A store manager types a question. The Copilot decides whether it needs **numbers
 | "Delete the duplicate POS codes." | Refused by the first node, before any model sees it |
 | A Store 2 manager asks "How did the flagship do?" | "That data is outside your store access." |
 
-![An answer card: route and verification badges, the answer, its citation, then data, SQL, checks, sources and the path through the graph](docs_assets/ask.png)
+![An answer card: route and verification badges, the answer, its citation, then the data, how it was checked, and the sources](docs_assets/ask.png)
 
 ## Master data, the analyst's weekly audit
 
@@ -76,21 +76,28 @@ Each check is one line of SQL in [`copilot/templates.py`](copilot/templates.py),
 
 ## Planning model (Excel)
 
-[`store_planning_model.xlsx`](https://github.com/A28-2001/store-copilot/raw/main/planning/store_planning_model.xlsx) turns the last 30 days of the same data into three planning questions:
+[`store_planning_model.xlsx`](https://github.com/A28-2001/store-copilot/raw/main/planning/store_planning_model.xlsx) turns the last 30 days of the same data into four questions, one tab each:
 
-- **New Store:** what a new location costs, how fast it ramps, and when it pays back, month by month for five years, with a sensitivity grid.
-- **3-Year Plan:** revenue and EBITDA by channel (grocery, cafe and hot bar, catering, app orders, membership fees) as new stores open.
-- **Pricing:** pick a category and test a price change or a promotion. It shows the gross profit effect, the break-even unit change, and whether the discount is within the 30% markdown cap.
+| Tab | The question | What it shows |
+|---|---|---|
+| **New Store** | Should we open one? | Cost, ramp and payback, month by month for five years |
+| **Cash** | Can we afford it? | A 13-week cash forecast, with vendors paid on their real payment terms |
+| **Inventory** | Where is cash tied up? | Days of stock, turns, slow stock, and stock against shelf life |
+| **Pricing** | What does a price move do? | Gross profit effect of a price change or a promotion, with the break-even |
 
-| Scenario | New store payback | 2029 revenue | 2029 company EBITDA | Cash after new stores, 2027 to 2029 |
-|---|---|---|---|---|
-| Base | 48 months | $41.7M | $3.1M | ($0.2M) |
-| Upside | 27 months | $62.0M | $7.9M | $5.6M |
-| Downside | over 60 months | $25.6M | ($0.3M) | ($4.1M) |
+![The Summary tab: the scenario switch, four headline numbers and three charts](docs_assets/planning_model.png)
 
-The Downside row is the useful one: if a new store ramps slowly, the plan should wait for the first store to prove itself before opening more.
+One switch on the Summary tab moves every tab between Base, Upside and Downside:
 
-Sales, margins, waste and member activity come from the data; store sizes, labor, rent and build-out are assumptions, each with a note. Every number except the pasted actuals is a formula (1,274 of them). The actuals are tied out before they're written, 13 checks inside the workbook work key numbers out a second way, and [a test](tests/test_workbook.py) rebuilds the whole model in Python and matches it to the cent in all three scenarios. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
+| Scenario | New store payback | Funding needed to open it | Lowest cash in 13 weeks |
+|---|---|---|---|
+| Base | 48 months | $1.4M | ($1.1M) |
+| Upside | 30 months | $1.0M | ($0.8M) |
+| Downside | over 60 months | $2.1M | ($1.8M) |
+
+Two things the model surfaces. A new store can't be paid for from the stores' own cash, so the funding has to be arranged before the build starts. And produce, meat and juices hold more days of stock than their shelf life, which is where the waste comes from.
+
+Sales, cost of goods, waste and stock come from the data; store sizes, labor, rent, opening costs and cash in the bank are assumptions, each with a note. Every number except the pasted actuals is a formula. The actuals are tied out before they're written, 14 checks inside the workbook work key numbers out a second way, and [a test](tests/test_workbook.py) rebuilds the model in Python and matches it in all three scenarios. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
 
 ## Why numbers go to SQL and documents go to retrieval
 
@@ -199,7 +206,7 @@ How to read this honestly. Every mode was run twice, and **the second runs are o
 - **40 questions** catch regressions. They aren't a benchmark.
 - **Verified is not proven.** Two queries agreeing makes a silent error much less likely, not impossible: both can share the same wrong assumption.
 - **Not production.** There's no auth provider, no audit log and no live POS feed.
-- **The planning model's costs are assumptions.** Labor, rent, build-out and store sizes aren't in the data; the model shows how the decision changes as they move, not what they are.
+- **The planning model's costs are assumptions.** Labor, rent, build-out, store sizes and cash in the bank aren't in the data; the model shows how the decision changes as they move, not what they are.
 
 ## Connecting real data
 

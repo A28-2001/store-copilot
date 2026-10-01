@@ -227,17 +227,18 @@ with st.sidebar:
         st.caption("Ask about another store and the Copilot will tell you it's outside your access.")
 
     st.divider()
-    typed_key = st.text_input("Groq API key (optional)", type="password", key="groq_key",
-                              help="Free at console.groq.com. Kept in this browser session only, never stored.")
-    key = resolve_key(typed_key)
-    key_ok, key_msg = key_status(key_fingerprint(key), key) if key else (False, "")
-    if key and not key_ok:
-        where = "" if (typed_key or "").strip() else " (the key found in secrets or the environment)"
-        st.caption(f"⚠️ {key_msg[:-1]}{where}. Running in demo mode.")
-        key = None
-    use_llm = st.toggle("Ask anything (LLM mode)", value=bool(key), disabled=not key, key="use_llm",
-                        help="Without a working key the Copilot runs in demo mode: a fixed library of verified "
-                             "questions.")
+    with st.expander("AI settings"):
+        typed_key = st.text_input("Groq API key (optional)", type="password", key="groq_key",
+                                  help="Free at console.groq.com. Kept in this browser session only, never stored.")
+        key = resolve_key(typed_key)
+        key_ok, key_msg = key_status(key_fingerprint(key), key) if key else (False, "")
+        if key and not key_ok:
+            where = "" if (typed_key or "").strip() else " (the key found in secrets or the environment)"
+            st.caption(f"⚠️ {key_msg[:-1]}{where}. Running in demo mode.")
+            key = None
+        use_llm = st.toggle("Ask anything (LLM mode)", value=bool(key), disabled=not key, key="use_llm",
+                            help="Without a working key the Copilot runs in demo mode: a fixed library of verified "
+                                 "questions.")
     llm_on = bool(key and use_llm)
     if llm_on:
         st.markdown(pill("verified", f"LLM mode · {PRIMARY_MODEL.split('/')[-1]} on Groq"), unsafe_allow_html=True)
@@ -246,15 +247,14 @@ with st.sidebar:
 
     if PLAN_BOOK.exists():
         st.divider()
-        st.markdown("<div class='side-sub'><b>Planning model (Excel)</b><br>New store payback, a 3-year plan by "
-                    "channel, and pricing and promotion tests, built on this data.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='side-sub'><b>Planning model (Excel)</b><br>New store payback, a 13-week cash "
+                    "forecast, inventory and pricing tests.</div>", unsafe_allow_html=True)
         st.download_button("Download the model", PLAN_BOOK.read_bytes(), file_name=PLAN_BOOK.name, key="plan_book",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     st.divider()
-    st.markdown("<div class='disclaimer'><b>All data is synthetic.</b> A portfolio project modelled on a "
-                "multi-store clean-label grocer. Not affiliated with any company; no real sales, prices or "
-                "policies. Policy documents are illustrative.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='disclaimer'><b>All data is made up.</b> A portfolio project, not affiliated with "
+                "any company.</div>", unsafe_allow_html=True)
 
 copilot = get_copilot(tuple(allowed), key_fingerprint(key) if llm_on else None, key if llm_on else None, CODE_VERSION)
 history_key = f"history::{','.join(allowed)}::{'llm' if llm_on else 'demo'}"
@@ -267,9 +267,8 @@ st.markdown(f"""
 <div class="hero">
   <div class="eyebrow">Store Copilot &nbsp;·&nbsp; synthetic data</div>
   <h1>Ask your stores anything.<br>Get a checked answer.</h1>
-  <p>Numbers come from SQL and are re-checked by a second, independently written query before they're called
-  verified. Policy questions are answered from the documents, with the section cited. It can't change data,
-  and every role sees only its own stores. Start with what needs attention: prices, the app catalog and POS codes.</p>
+  <p>Every number is checked by a second query before it's called verified. Every policy answer is quoted
+  from its source.</p>
   <div class="chips"><span>Asking as <b>{esc(role)}</b></span><span>Viewing <b>{esc(templates.scope_label(view))}</b></span>
   <span><b>{mode_label}</b></span></div>
 </div>""", unsafe_allow_html=True)
@@ -295,11 +294,11 @@ with tabs[0]:
                     f"so its trends are low confidence until day {config.load_config()['low_history_days']}.</div>",
                     unsafe_allow_html=True)
 
-    items = dashboard.brief(panels)
+    items = dashboard.brief(panels)[:4]
     if items:
         st.subheader("What needs attention")
-        st.markdown("<div class='section-sub'>Pulled from verified queries. Each one opens the full answer, with "
-                    "the data, the SQL and the checks behind it.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-sub'>Each one opens the full answer, with the data and the checks behind "
+                    "it.</div>", unsafe_allow_html=True)
         for row in range(0, len(items), 2):
             cols = st.columns(2)
             for i, (col, it) in enumerate(zip(cols, items[row:row + 2])):
@@ -319,10 +318,10 @@ with tabs[0]:
             bands = {config.store_label(s): str(config.store_by_id(s)["open_date"]) for s in young}
             st.plotly_chart(charts.revenue_trend(trend.df, bands), theme=None, config={"displayModeBar": False})
     margin = panels["margin_vs_target"]
-    with st.container(border=True):
-        st.markdown(f"<div class='card-title'>Margin vs target by category</div><div class='card-sub'>Points above "
-                    f"or below target, last 30 days · {verify_pill(margin.verification.status if margin.verification else None)}"
-                    f"</div>", unsafe_allow_html=True)
+    with st.expander("Margin vs target by category"):
+        st.markdown(f"<div class='card-sub'>Points above or below target, last 30 days · "
+                    f"{verify_pill(margin.verification.status if margin.verification else None)}</div>",
+                    unsafe_allow_html=True)
         if not margin.df.empty:
             st.plotly_chart(charts.margin_gap(margin.df), theme=None, config={"displayModeBar": False})
 
@@ -352,19 +351,24 @@ def render_answer(a: Answer) -> None:
             label = f"Data · {len(a.data)} rows" + (" (capped at 500)" if a.truncated else "")
             with st.expander(label):
                 show_table(a.data, height=min(420, 38 + 35 * len(a.data)))
-        if a.sql:
-            with st.expander("SQL"):
-                st.code(a.sql, language="sql")
-        if a.verification:
-            passed = sum(1 for c in a.verification.checks if c.passed)
-            with st.expander(f"Checks · {passed} of {len(a.verification.checks)} passed"):
-                st.caption(a.verification.message)
-                for c in a.verification.checks:
-                    icon = "✅" if c.passed else ("⚠️" if c.passed is False else "○")
-                    st.markdown(f"{icon} **{c.name}**: {esc(c.detail)}", unsafe_allow_html=True)
+        if a.sql or a.verification:
+            label = "How it was checked"
+            if a.verification:
+                passed = sum(1 for c in a.verification.checks if c.passed)
+                label += f" · {passed} of {len(a.verification.checks)} checks passed"
+            with st.expander(label):
+                if a.verification:
+                    st.caption(a.verification.message)
+                    for c in a.verification.checks:
+                        icon = "✅" if c.passed else ("⚠️" if c.passed is False else "○")
+                        st.markdown(f"{icon} **{c.name}**: {esc(c.detail)}", unsafe_allow_html=True)
+                if a.sql:
+                    st.caption("The query:")
+                    st.code(a.sql, language="sql")
                 if a.check_sql:
                     st.caption("The independent query:")
                     st.code(a.check_sql, language="sql")
+                st.caption("Steps: " + " → ".join(STEP_LABELS.get(n, n) for n in a.trace))
         if a.sources:
             with st.expander(f"Sources · {len(a.sources)}"):
                 for i, s in enumerate(a.sources, 1):
@@ -372,15 +376,11 @@ def render_answer(a: Answer) -> None:
                     st.markdown(f"<div class='src'><b>[{i}] {esc(s['citation'])}{tag}</b> · illustrative</div>"
                                 f"<div class='src' style='margin-bottom:10px'>{esc(s['text'])}</div>",
                                 unsafe_allow_html=True)
-        with st.expander("Path through the graph"):
-            st.markdown(" → ".join(f"`{n}`" for n in a.trace))
-            st.caption(" · ".join(STEP_LABELS.get(n, n) for n in a.trace))
 
 
 with tabs[1]:
-    st.markdown("<div class='section-sub' style='margin-top:4px'>Numbers go to SQL and get re-checked by an "
-                "independent query. Policy questions go to the documents and come back with the section cited. "
-                "Try a suggestion, or ask your own.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub' style='margin-top:4px'>Try a suggestion, or ask your own. Numbers are "
+                "re-checked; policies come back with the section cited.</div>", unsafe_allow_html=True)
     label_of = {v: k for k, v in {**SUGGESTED, **MORE_QUESTIONS}.items()}
     st.pills("Try one", list(SUGGESTED.values()), format_func=label_of.get, key="pills_main",
              on_change=pick_suggestion, args=("pills_main",), label_visibility="collapsed")
@@ -422,8 +422,9 @@ FROM sku_map mp JOIN sku_master sm ON sm.master_sku_id = mp.master_sku_id
 GROUP BY mp.store_id, mp.master_sku_id HAVING COUNT(*) > 1 ORDER BY mp.store_id, product"""
 
 
-def panel_header(title: str, panel: dashboard.Panel, sub: str = "") -> None:
-    st.subheader(title)
+def panel_header(title: str | None, panel: dashboard.Panel, sub: str = "") -> None:
+    if title:
+        st.subheader(title)
     status = panel.verification.status if panel.verification else None
     st.markdown(f"<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-6px 0 8px'>"
                 f"{verify_pill(status)}<span class='meta'>{esc(sub)}</span></div>"
@@ -451,22 +452,19 @@ with tabs[2]:
 
     st.divider()
     hygiene = panels["sku_hygiene"]
-    panel_header("Duplicate and unmapped POS codes", hygiene, "by store")
-    if not hygiene.df.empty:
-        show_table(hygiene.df)
-        d1, d2 = st.columns(2)
-        with d1.expander("Unmapped codes with sales"):
-            st.caption("Detail list (not independently checked).")
-            show_table(load_detail(tuple(view), UNMAPPED_SQL, CODE_VERSION))
-        with d2.expander("Products with two POS codes"):
-            st.caption("Detail list (not independently checked).")
-            show_table(load_detail(tuple(view), DUPLICATE_SQL, CODE_VERSION))
-
-    st.divider()
+    with st.expander("Duplicate and unmapped POS codes"):
+        panel_header(None, hygiene, "by store")
+        if not hygiene.df.empty:
+            show_table(hygiene.df)
+            st.caption("Unmapped codes with sales (detail list, not independently checked)")
+            show_table(load_detail(tuple(view), UNMAPPED_SQL, CODE_VERSION), height=240)
+            st.caption("Products with two POS codes (detail list, not independently checked)")
+            show_table(load_detail(tuple(view), DUPLICATE_SQL, CODE_VERSION), height=240)
     clean = panels["clean_standard"]
-    panel_header("Clean-standard watchlist", clean, "Fail first · sold in the last 7 days")
-    if not clean.df.empty:
-        show_table(clean.df, height=320)
+    with st.expander("Clean-standard watchlist"):
+        panel_header(None, clean, "Fail first · sold in the last 7 days")
+        if not clean.df.empty:
+            show_table(clean.df, height=320)
 
 
 # --------------------------------------------------------------------------- how it works
@@ -527,25 +525,19 @@ ATTACKS = {
 
 with tabs[3]:
     st.subheader("The path of a question")
-    st.markdown("<div class='section-sub'>A LangGraph state graph. LangChain supplies the parts (prompts, the Groq "
-                "chat model, a custom BM25 retriever); LangGraph supplies the control flow: a router, conditional "
-                "edges, a bounded retry loop, and one shared state every step reads and writes. This diagram is "
-                "drawn from the compiled graph the app is running.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>LangChain supplies the parts: prompts, the model, document search. "
+                "LangGraph controls the flow: route, retry once, verify. This diagram is drawn from the graph the "
+                "app is running.</div>", unsafe_allow_html=True)
     c1, c2 = st.columns([1.1, 1])
     with c1:
         st.graphviz_chart(graph_dot(copilot))
     with c2:
-        st.markdown("**Why numbers go to SQL and policies go to retrieval.** A number has one right answer that a "
-                    "database can compute exactly; asking a language model to recall it invites a confident guess. "
-                    "A policy is wording, so the job is finding the right section and quoting it with a citation.")
-        st.markdown(f"**The verifier.** In my [Yardstick]({YARDSTICK_URL}) study of LLM-written SQL, 82-97% of wrong "
-                    "queries ran without error and returned plausible numbers. So \"the query ran\" proves nothing. "
-                    "Every number here is re-computed by a second, differently written query (subqueries instead of "
-                    "joins, julianday instead of date) and must match within 0.5%, plus sanity rules. Only then is it "
-                    "labelled Verified; if not, you see \"Checks disagree\" and why.")
-        st.markdown("**Stores are config, not code.** Every table carries a store_id and the stores live in "
-                    "`config/stores.yaml`. Adding store 4 is one entry there. Young stores are flagged automatically "
-                    "until they have 30 days of history.")
+        st.markdown("**Numbers go to SQL, policies go to documents.** A database computes a number exactly; a "
+                    "language model asked to recall one will guess. A policy is wording, so the job is to find the "
+                    "right section and quote it.")
+        st.markdown(f"**The verifier.** In my [Yardstick]({YARDSTICK_URL}) study, 82-97% of wrong AI-written queries "
+                    "ran without error and returned plausible numbers. So every number here is worked out again by "
+                    "a second, differently written query and must match within 0.5% before it's labelled Verified.")
 
     st.divider()
     st.subheader("Safety, enforced in code")
@@ -590,10 +582,8 @@ with tabs[3]:
     st.divider()
     st.subheader("Evaluation")
     results = load_eval()
-    st.markdown("<div class='section-sub'>40 golden questions in everyday phrasing, written before the first run: "
-                "20 numbers, 12 policy, 4 mixed, 4 traps. Each mode was run twice and both runs are shown: the first "
-                "runs exposed gaps (phrasing the keyword router didn't know; business conventions the LLM was never "
-                "told), those were fixed, so the second runs are optimistic.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>40 test questions, written before the first run. Each mode was run twice "
+                "and both runs are shown, misses included.</div>", unsafe_allow_html=True)
     if not results:
         st.caption("Run `python eval/run_eval.py --mode demo` to fill this in.")
     if results:
@@ -603,21 +593,20 @@ with tabs[3]:
             values = {m["metric"]: m["value"] for m in r["metrics"]}
             table[label] = [values.get(n, "not measured") for n in names]
         show_table(table)
-        st.caption("LLM answers are graded against per-question answer keys (the facts a correct answer must "
-                   "contain); 'Exact table match' is the strict version, which penalises different but valid column "
-                   "choices. The first LLM run only had the strict grader. In run 2, every answer labelled Verified "
-                   "was correct and both wrong answers were flagged. 56 of its 121 model calls fell back to "
-                   "gpt-oss-20b under free-tier rate limits.")
+        st.caption("In LLM run 2, every answer labelled Verified was correct and both wrong answers were flagged.")
+        with st.expander("How it was graded"):
+            st.markdown("20 number questions, 12 policy, 4 mixed and 4 traps. The first runs exposed gaps (phrasing "
+                        "the keyword router didn't know; business conventions the LLM was never told). Those were "
+                        "fixed, so the second runs are optimistic. LLM answers are graded against per-question "
+                        "answer keys; 'Exact table match' is the strict version, which penalises different but "
+                        "valid column choices. 56 of the 121 model calls in run 2 fell back to gpt-oss-20b under "
+                        "free-tier rate limits.")
 
     st.divider()
     st.subheader("Limits")
     st.markdown("""
-- **Synthetic data.** Three stores, 2,000 SKUs, 90 days, generated with a fixed seed. No real sales, prices or policies.
-- **BM25, not embeddings.** Exact-term search suits short policies full of vendor names and numbers, but it misses
-  paraphrases that share no words with the text. Embeddings are a drop-in upgrade behind the same retriever interface.
-- **A small evaluation.** 40 golden questions. Good for catching regressions, not a benchmark.
-- **Verified is not proven.** Two queries agreeing makes a silent error much less likely, not impossible: both can
-  share the same wrong assumption.
-- **Not production.** No auth provider, no audit log, no live POS feed. Real data would come from nightly POS exports
-  loaded into the same tables.
+- **Made-up data.** Three stores, 2,000 SKUs, 90 days. No real sales, prices or policies.
+- **Verified is not proven.** Two queries agreeing makes a silent error much less likely, not impossible.
+- **A small evaluation.** 40 questions catch regressions; they aren't a benchmark.
+- **Not production.** No logins, no audit log, no live POS feed. Real data would come from nightly POS exports.
 """)
