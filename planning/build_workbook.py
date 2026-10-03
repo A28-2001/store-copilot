@@ -349,12 +349,13 @@ SCENARIO_INPUTS = [
         ("ramp_start", "Month 1 sales", "% of mature", (0.60, 0.70, 0.50), PCT0, None),
         ("ramp_months", "Months to reach mature sales", "months", (18, 12, 24), NUM,
          "The demo data ramps a store in 30 days, which is fast. Real stores take 12 to 24 months."),
-        ("buildout_psf", "Build-out", "$ per sq ft", (250, 225, 300), USD, "Construction, equipment, fixtures."),
+        ("buildout_psf", "Build-out", "$ per sq ft", (350, 300, 425), USD,
+         "Construction, equipment and fixtures, including a full cafe and hot bar."),
     ]),
     ("Store running costs", [
         ("labor_pct", "Store labor", "% of sales", (0.19, 0.18, 0.21), PCT,
          "Not in the data. The cafe and hot bar make this higher than a typical grocery store."),
-        ("rent_psf", "Rent", "$ per sq ft per year", (60, 55, 70), USD, "Not in the data."),
+        ("rent_psf", "Rent", "$ per sq ft per year", (90, 80, 110), USD, "Not in the data. A premium street-level location."),
         ("other_pct", "Other operating costs", "% of sales", (0.08, 0.075, 0.09), PCT,
          "Card fees, utilities, supplies, repairs, local marketing. Not in the data."),
     ]),
@@ -366,10 +367,10 @@ SCENARIO_INPUTS = [
 
 # (name, label, unit, value, format, note)
 FIXED_INPUTS = [
-    ("sqft_s1", "Flagship size", "sq ft", 12000, NUM, "Store sizes are not in the data."),
-    ("sqft_s2", "Store 2 size", "sq ft", 8500, NUM, None),
-    ("sqft_s3", "Store 3 size", "sq ft", 6500, NUM, None),
-    ("sqft_new", "New store size", "sq ft", 8000, NUM, None),
+    ("sqft_s1", "Flagship size", "sq ft", 4700, NUM, "Store sizes are not in the data. Sized as a boutique grocer and cafe."),
+    ("sqft_s2", "Store 2 size", "sq ft", 3400, NUM, None),
+    ("sqft_s3", "Store 3 size", "sq ft", 2600, NUM, None),
+    ("sqft_new", "New store size", "sq ft", 4700, NUM, "The same format as the flagship."),
     ("opening_costs", "Opening costs", "$", 350000, USD, "Hiring, training, launch marketing and the first stock."),
     ("labor_floor", "Labor floor while a store ramps", "% of mature labor", 0.85, PCT0,
      "A new store can't cut staff in line with lower early sales."),

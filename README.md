@@ -91,11 +91,11 @@ One switch on the Summary tab moves every tab between Base, Upside and Downside:
 
 | Scenario | New store payback | Funding needed to open it | Lowest cash in 13 weeks |
 |---|---|---|---|
-| Base | 48 months | $1.4M | ($1.1M) |
-| Upside | 30 months | $1.0M | ($0.8M) |
-| Downside | over 60 months | $2.1M | ($1.8M) |
+| Base | 24 months | $0.9M | ($0.7M) |
+| Upside | 15 months | $0.5M | ($0.3M) |
+| Downside | 53 months | $1.5M | ($1.3M) |
 
-Two things the model surfaces. A new store can't be paid for from the stores' own cash, so the funding has to be arranged before the build starts. And produce, meat and juices hold more days of stock than their shelf life, which is where the waste comes from.
+The stores are sized as a boutique grocer and cafe, about 4,700 sq ft. Two things the model surfaces. Even a store that pays back in two years can't be paid for from the stores' own cash, so the funding has to be arranged before the build starts. And produce, meat and juices hold more days of stock than their shelf life, which is where the waste comes from.
 
 Sales, cost of goods, waste and stock come from the data; store sizes, labor, rent, opening costs and cash in the bank are assumptions, each with a note. Every number except the pasted actuals is a formula. The actuals are tied out before they're written, 14 checks inside the workbook work key numbers out a second way, and [a test](tests/test_workbook.py) rebuilds the model in Python and matches it in all three scenarios. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
 
