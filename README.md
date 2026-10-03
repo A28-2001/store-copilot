@@ -21,10 +21,10 @@
 |---|---|
 | POS master data: SKUs, costs, prices, vendor records | [Master data audit](#master-data-the-analysts-weekly-audit): 9 checks, each tied to a written rule |
 | Keeping the POS and a mobile app catalog in sync | The "POS vs app catalog" check |
-| Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief |
+| Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief; a [3-slide board pack](#board-pack) built from the data |
 | Excel financial modeling | [Planning model](#planning-model-excel): new store payback, a 13-week cash forecast, inventory, pricing tests, Base / Upside / Downside |
 | SQL | 16 question queries, each with an independent check query ([`templates.py`](copilot/templates.py)) |
-| Python and APIs | Data generator, engine, Groq API, 55 automated tests |
+| Python and APIs | Data generator, engine, Groq API, 58 automated tests |
 | Dashboards | Streamlit app, Plotly charts, a colorblind-checked palette |
 | AI tools in real workflows | LangChain + LangGraph, retrieval over documents (RAG), built with Claude Code |
 | Data quality and honest measurement | [The verifier](#the-verifier), a 40-question evaluation with every miss reported |
@@ -98,6 +98,10 @@ One switch on the Summary tab moves every tab between Base, Upside and Downside:
 The stores are sized as a boutique grocer and cafe, about 4,700 sq ft. Two things the model surfaces. Even a store that pays back in two years can't be paid for from the stores' own cash, so the funding has to be arranged before the build starts. And produce, meat and juices hold more days of stock than their shelf life, which is where the waste comes from.
 
 Sales, cost of goods, waste and stock come from the data; store sizes, labor, rent, opening costs and cash in the bank are assumptions, each with a note. Every number except the pasted actuals is a formula. The actuals are tied out before they're written, 14 checks inside the workbook work key numbers out a second way, and [a test](tests/test_workbook.py) rebuilds the model in Python and matches it in all three scenarios. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
+
+## Board pack
+
+[`board_pack.pdf`](planning/board_pack.pdf) is three slides, one message each: the month in one slide, margin leaks in dollars, and stock and waste. [`planning/build_board_pack.py`](planning/build_board_pack.py) writes it from the data, so nothing is typed by hand: every number is worked out two ways and the build stops if they disagree. When the month closes, run it again.
 
 ## Why numbers go to SQL and documents go to retrieval
 
@@ -221,10 +225,11 @@ pip install -r requirements.txt && streamlit run streamlit_app.py
 The database builds itself on first run (about a second). It runs in **demo mode** with no key. With a key, the suggestion buttons still answer instantly from the verified question library, and typed questions go to the LLM. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
 
 ```bash
-pytest                                  # 55 tests, no key needed (the LLM path uses a fake model)
+pytest                                  # 58 tests, no key needed (the LLM path uses a fake model)
 python eval/run_eval.py --mode demo     # the 40-question evaluation
 python data/generate.py --seed 7        # rebuild the synthetic database
 python planning/build_workbook.py       # rebuild the Excel model (Excel calculates it on open)
+python planning/build_board_pack.py     # rebuild the board pack (.pptx)
 ```
 
 ## Repo layout
@@ -240,7 +245,7 @@ copilot/rag.py         section chunking + BM25 BaseRetriever with version filter
 copilot/engine.py      the LangGraph: screen -> route -> numbers / documents / both / refuse
 copilot/llm.py         ChatGroq with fallback; key resolution and key check
 streamlit_app.py       the app
-planning/              the Excel planning model and the script that builds it
+planning/              the Excel planning model, the board pack, and the scripts that build them
 eval/                  golden set, dev set, runner, results
 tests/                 pytest suite
 ```

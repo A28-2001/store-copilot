@@ -17,6 +17,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
 PLAN_BOOK = ROOT / "planning" / "store_planning_model.xlsx"
+BOARD_PACK = ROOT / "planning" / "board_pack.pdf"
 # Fingerprint of the code, docs and config. A redeploy can update the files while the server process
 # keeps running with the old modules in memory, so when the fingerprint changes we drop our own
 # modules and import them fresh, and every cache key includes it too.
@@ -251,6 +252,11 @@ with st.sidebar:
                     "forecast, inventory and pricing tests.</div>", unsafe_allow_html=True)
         st.download_button("Download the model", PLAN_BOOK.read_bytes(), file_name=PLAN_BOOK.name, key="plan_book",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if BOARD_PACK.exists():
+        st.markdown("<div class='side-sub'><b>Board pack (PDF)</b><br>Three slides, built from the data: the month, "
+                    "margin leaks in dollars, stock and waste.</div>", unsafe_allow_html=True)
+        st.download_button("Download the board pack", BOARD_PACK.read_bytes(), file_name=BOARD_PACK.name,
+                           key="board_pack", mime="application/pdf")
 
     st.divider()
     st.markdown("<div class='disclaimer'><b>All data is made up.</b> A portfolio project, not affiliated with "
