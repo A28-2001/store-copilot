@@ -29,7 +29,8 @@ if "copilot" in sys.modules and getattr(sys.modules["copilot"], "__code_version_
         del sys.modules[_name]
 
 import copilot as copilot_pkg  # noqa: E402
-from copilot import charts, config, dashboard, templates  # noqa: E402
+from copilot import charts, config, dashboard, story, templates  # noqa: E402
+from copilot.figures import figures as month_figures  # noqa: E402
 from copilot.db import QueryError, QueryRejected, StoreDB, guard_sql  # noqa: E402
 from copilot.engine import STEP_LABELS, Answer, Copilot  # noqa: E402
 from copilot.llm import PRIMARY_MODEL, check_key, make_llm, resolve_key  # noqa: E402
@@ -39,7 +40,7 @@ copilot_pkg.__code_version__ = CODE_VERSION
 st.set_page_config(page_title="Store Copilot", page_icon="🌿", layout="wide", initial_sidebar_state="auto")
 ensure_db()
 
-TABS = ["Overview", "Ask the Copilot", "Master data", "How it works"]
+TABS = ["Story", "Overview", "Ask the Copilot", "Master data", "How it works"]
 YARDSTICK_URL = "https://a28-2001.github.io/yardstick/"
 
 # Six to start with; the rest of the built-in questions sit behind "More questions".
@@ -200,9 +201,38 @@ def load_detail(scope: tuple[str, ...], sql: str, version: str = CODE_VERSION) -
     return StoreDB(list(scope)).run(sql).df
 
 
+@st.cache_resource(show_spinner=False)
+def story_component(version: str = CODE_VERSION):
+    return st.components.v2.component("story", html=story.HTML, css=story.CSS, js=story.JS)
+
+
+@st.cache_data(show_spinner=False)
+def load_story(version: str = CODE_VERSION) -> str:
+    return story.build(month_figures(), story.plan_numbers(PLAN_BOOK))
+
+
+def story_goto() -> None:
+    """A link in the story was clicked: open the tab it points at."""
+    state = st.session_state.get("story")
+    target = getattr(state, "goto", None) or (state.get("goto") if isinstance(state, dict) else None)
+    where, _, question = str(target or "").partition(":")
+    if where == "ask":
+        if question:
+            st.session_state.pending = (question, "button")
+        st.session_state.nav = "Ask the Copilot"
+    elif where == "master":
+        st.session_state.nav = "Master data"
+    elif where:
+        st.session_state.nav = "Overview"
+
+
+def open_tab(name: str) -> None:
+    st.session_state.nav = name
+
+
 def go_ask(question: str) -> None:
     st.session_state.pending = (question, "button")
-    st.session_state.nav = TABS[1]
+    st.session_state.nav = "Ask the Copilot"
 
 
 def pick_suggestion(widget_key: str) -> None:
@@ -281,8 +311,27 @@ st.markdown(f"""
 
 tabs = st.tabs(TABS, key="nav", on_change="rerun")
 
-# --------------------------------------------------------------------------- overview
+# --------------------------------------------------------------------------- story
 with tabs[0]:
+    if role != "Owner":
+        st.markdown("<div class='note'>The story covers all three stores, so it's shown to the owner. Switch "
+                    "\"Who's asking?\" to Owner in the sidebar to read it.</div>", unsafe_allow_html=True)
+    else:
+        story_component(CODE_VERSION)(key="story", data={"html": load_story(CODE_VERSION)}, on_goto_change=story_goto)
+        c1, c2, c3 = st.columns(3)
+        if BOARD_PACK.exists():
+            c1.download_button("Board pack (PDF)", BOARD_PACK.read_bytes(), file_name=BOARD_PACK.name,
+                               key="story_pack", mime="application/pdf", width="stretch")
+        if PLAN_BOOK.exists():
+            c2.download_button("Planning model (Excel)", PLAN_BOOK.read_bytes(),
+                               file_name=PLAN_BOOK.name, key="story_plan", width="stretch",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        c3.button("Explore the live tools →", key="story_explore", on_click=open_tab, args=("Overview",),
+                  type="primary", width="stretch")
+
+
+# --------------------------------------------------------------------------- overview
+with tabs[1]:
     panels = load_overview(tuple(view), CODE_VERSION)
     cards = dashboard.kpis(panels)
     for row in range(0, len(cards), 3):
@@ -384,7 +433,7 @@ def render_answer(a: Answer) -> None:
                                 unsafe_allow_html=True)
 
 
-with tabs[1]:
+with tabs[2]:
     st.markdown("<div class='section-sub' style='margin-top:4px'>Try a suggestion, or ask your own. Numbers are "
                 "re-checked; policies come back with the section cited.</div>", unsafe_allow_html=True)
     label_of = {v: k for k, v in {**SUGGESTED, **MORE_QUESTIONS}.items()}
@@ -437,7 +486,7 @@ def panel_header(title: str | None, panel: dashboard.Panel, sub: str = "") -> No
                 f"<div class='answer' style='margin-top:0'>{answer_html(panel.summary)}</div>", unsafe_allow_html=True)
 
 
-with tabs[2]:
+with tabs[3]:
     panels = load_overview(tuple(view), CODE_VERSION)
     audit = panels["master_data_audit"]
     panel_header("Master data audit", audit, "9 checks from the Item Setup and Master Data SOP")
@@ -529,7 +578,7 @@ ATTACKS = {
                                "WHERE store_id = 'S1' GROUP BY 1",
 }
 
-with tabs[3]:
+with tabs[4]:
     st.subheader("The path of a question")
     st.markdown("<div class='section-sub'>LangChain supplies the parts: prompts, the model, document search. "
                 "LangGraph controls the flow: route, retry once, verify. This diagram is drawn from the graph the "

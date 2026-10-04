@@ -24,20 +24,23 @@
 | Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief; a [3-slide board pack](#board-pack) built from the data |
 | Excel financial modeling | [Planning model](#planning-model-excel): new store payback, a 13-week cash forecast, inventory, pricing tests, Base / Upside / Downside |
 | SQL | 16 question queries, each with an independent check query ([`templates.py`](copilot/templates.py)) |
-| Python and APIs | Data generator, engine, Groq API, 58 automated tests |
-| Dashboards | Streamlit app, Plotly charts, a colorblind-checked palette |
+| Python and APIs | Data generator, engine, Groq API, 60 automated tests |
+| Dashboards | Streamlit app, Plotly charts, a scroll story with parallax and a pinned chart, a colorblind-checked palette |
 | AI tools in real workflows | LangChain + LangGraph, retrieval over documents (RAG), built with Claude Code |
 | Data quality and honest measurement | [The verifier](#the-verifier), a 40-question evaluation with every miss reported |
 | Data access and safety | Read-only, per-store access enforced in code ([`db.py`](copilot/db.py)) |
 
 ## A 2-minute tour
 
-1. Open the [live demo](https://store-copilot-demo.streamlit.app/). On the Overview, click any card under **What needs attention**. It opens the full answer, with the data, the SQL and the checks behind it.
-2. Open the **Master data** tab for the 9-check audit.
-3. In **Ask the Copilot**, press **Item setup rules** for an answer quoted from a policy, with its citation.
-4. In the sidebar, switch to **Store manager** and type "How did the flagship do?". It refuses: that store is outside your access.
-5. In **How it works**, press **Try to break it** to see which safety layer stops each attack.
-6. Download the **planning model** from the sidebar and switch the scenario on its Summary tab to Downside.
+1. Open the [live demo](https://store-copilot-demo.streamlit.app/). The **Story** tab walks through one month in four chapters: scroll, and the chart changes with the text. Its links open the tools behind each claim.
+2. On the **Overview**, click any card under **What needs attention**. It opens the full answer, with the data, the SQL and the checks behind it.
+3. Open the **Master data** tab for the 9-check audit.
+4. In **Ask the Copilot**, press **Item setup rules** for an answer quoted from a policy, with its citation.
+5. In the sidebar, switch to **Store manager** and type "How did the flagship do?". It refuses: that store is outside your access.
+6. In **How it works**, press **Try to break it** to see which safety layer stops each attack.
+7. Download the **planning model** from the sidebar and switch the scenario on its Summary tab to Downside.
+
+![The Story tab: one month told in four chapters, with parallax and a chart that changes as you scroll](docs_assets/story.png)
 
 ## Examples
 
@@ -225,7 +228,7 @@ pip install -r requirements.txt && streamlit run streamlit_app.py
 The database builds itself on first run (about a second). It runs in **demo mode** with no key. With a key, the suggestion buttons still answer instantly from the verified question library, and typed questions go to the LLM. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
 
 ```bash
-pytest                                  # 58 tests, no key needed (the LLM path uses a fake model)
+pytest                                  # 60 tests, no key needed (the LLM path uses a fake model)
 python eval/run_eval.py --mode demo     # the 40-question evaluation
 python data/generate.py --seed 7        # rebuild the synthetic database
 python planning/build_workbook.py       # rebuild the Excel model (Excel calculates it on open)
@@ -244,6 +247,8 @@ copilot/verifier.py    independent-check + sanity rules, compare_frames
 copilot/rag.py         section chunking + BM25 BaseRetriever with version filter and relevance floor
 copilot/engine.py      the LangGraph: screen -> route -> numbers / documents / both / refuse
 copilot/llm.py         ChatGroq with fallback; key resolution and key check
+copilot/figures.py     the month's headline numbers, each worked out two ways (story and board pack)
+copilot/story.py       the Story tab: chapters, parallax, the pinned chart
 streamlit_app.py       the app
 planning/              the Excel planning model, the board pack, and the scripts that build them
 eval/                  golden set, dev set, runner, results
