@@ -292,9 +292,22 @@ export default function (component) {
 
   const figs = [...root.querySelectorAll('.fig')];
   const steps = [...root.querySelectorAll('.step')];
+  let current = -1;
   const show = (i) => {
+    if (i === current) return;
+    current = i;
     figs.forEach((f, j) => f.classList.toggle('on', j === i));
     steps.forEach((s, j) => s.classList.toggle('on', j === i));
+  };
+  const nearest = () => {             // the step closest to the middle of the screen
+    const mid = window.innerHeight / 2;
+    let best = current < 0 ? 0 : current, gap = Infinity;
+    steps.forEach((s, i) => {
+      const r = s.getBoundingClientRect();
+      const d = Math.abs(r.top + r.height / 2 - mid);
+      if (d < gap) { gap = d; best = i; }
+    });
+    show(best);
   };
   show(0);
   const stepWatch = new IntersectionObserver((entries) => {
@@ -309,10 +322,11 @@ export default function (component) {
 
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const layers = [...root.querySelectorAll('[data-speed]')];
-  let queued = false, last = 0;
+  let queued = false;
   const move = () => {
     queued = false;
-    last = performance.now();
+    nearest();
+    if (still) return;
     const mid = window.innerHeight / 2;
     for (const el of layers) {
       const box = el.closest('.parallax').getBoundingClientRect();
@@ -322,14 +336,14 @@ export default function (component) {
     }
   };
   const onScroll = () => {
-    if (!queued) { queued = true; requestAnimationFrame(move); }
-    else if (performance.now() - last > 120) move();   // frames paused (hidden tab): don't get stuck
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(move);
+    setTimeout(() => { if (queued) move(); }, 150);   // if the browser pauses frames, update anyway
   };
-  if (!still) {
-    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    window.addEventListener('resize', onScroll);
-    move();
-  }
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  window.addEventListener('resize', onScroll);
+  move();
 
   root.querySelectorAll('[data-goto]').forEach((link) => {
     link.addEventListener('click', (e) => { e.preventDefault(); setTriggerValue('goto', link.dataset.goto); });
