@@ -1,0 +1,62 @@
+name: Keep the demo awake
+
+# Streamlit puts a free app to sleep when nobody has opened it for a while.
+# Every four hours this opens the demo in a real browser, wakes it if it's
+# asleep, and fails (so GitHub sends an email) if the app doesn't come up.
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install a headless browser
+        run: pip install -q playwright && python -m playwright install --with-deps chromium
+      - name: Open the demo
+        env:
+          APP_URL: https://store-copilot-demo.streamlit.app/
+        run: |
+          python - <<'PY'
+          import os
+          import time
+
+          from playwright.sync_api import sync_playwright
+
+          URL, READY = os.environ["APP_URL"], "Ask your stores anything"
+
+          def app_is_up(page):
+              for frame in page.frames:
+                  try:
+                      if READY in frame.inner_text("body", timeout=2_000):
+                          return True
+                  except Exception:
+                      pass
+              return False
+
+          with sync_playwright() as p:
+              page = p.chromium.launch().new_page()
+              page.goto(URL, wait_until="domcontentloaded", timeout=90_000)
+              wake = page.get_by_role("button", name="Yes, get this app back up!")
+              try:
+                  wake.wait_for(timeout=20_000)
+                  wake.click()
+                  print("The app was asleep. Woke it up.")
+              except Exception:
+                  print("The app was awake.")
+              deadline = time.time() + 300
+              while not app_is_up(page):
+                  if time.time() > deadline:
+                      raise SystemExit("The app did not come up within 5 minutes.")
+                  page.wait_for_timeout(5_000)
+              page.wait_for_timeout(20_000)
+              print("The app is up.")
+          PY
