@@ -140,7 +140,7 @@ flowchart TD
 
 ## The verifier
 
-In my [Yardstick](https://a28-2001.github.io/yardstick/) study of LLM-written SQL, 82-97% of wrong queries ran without error and returned plausible numbers. So "the query ran" proves nothing. Here a number is only labelled **Verified** when:
+In my [Yardstick](https://a28-2001.github.io/yardstick/) study of LLM-written SQL, 93 of the 104 wrong queries ran without any error. So "the query ran" proves nothing. Here a number is only labelled **Verified** when:
 
 1. **An independent query agrees.** In demo mode, each of the 16 question templates carries a hand-written check query that computes the same thing a different way (julianday instead of `date()`, subqueries instead of joins, raw sales instead of the velocity view). In LLM mode, the model writes a second formulation and `compare_frames` checks that the results match within 0.5%.
 2. **Sanity rules pass:** the result isn't empty; there are no negative units, revenue, stock, cost or cover; there are no missing store, SKU or category keys.
