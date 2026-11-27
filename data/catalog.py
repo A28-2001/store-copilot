@@ -1,14 +1,14 @@
 """Fictional brands and products for the synthetic catalog.
 
-Every brand here is made up. Local (South Florida flavored) brands are flagged
+Every brand here is made up. Local brands are flagged
 so the app can report local brand share.
 """
 
 # brand -> is_local_brand
 BRANDS = {
     # local
-    "Biscayne": 1, "Palmetto": 1, "Mangrove": 1, "Seagrape": 1, "Coquina": 1,
-    "Redland": 1, "Sawgrass": 1, "Wynwood": 1, "Poinciana": 1, "Tamiami": 1,
+    "Greenway": 1, "Kestrel": 1, "Mangrove": 1, "Seagrape": 1, "Cobblestone": 1,
+    "Redfield": 1, "Silverleaf": 1, "Wrenwood": 1, "Primrose": 1, "Tallgrass": 1,
     # national (fictional)
     "Northfield": 0, "Wildroot": 0, "Meadowlark": 0, "Sunhaven": 0, "True Acre": 0,
     "Fernwood": 0, "Oakline": 0, "Stillwater": 0, "Goldenrod": 0, "Clearspring": 0,
@@ -16,14 +16,14 @@ BRANDS = {
 }
 
 CATEGORY_BRANDS = {
-    "Produce": ["Biscayne", "Redland", "Mangrove", "Sawgrass", "True Acre", "Sunhaven", "Kindred Field", "Bright Furrow"],
-    "Meat & Seafood": ["Palmetto", "Coquina", "Tamiami", "Harbor Hill", "True Acre", "Kindred Field", "Stillwater"],
-    "Dairy & Eggs": ["Sawgrass", "Redland", "Meadowlark", "Clearspring", "Goldenrod", "Kindred Field", "Oakline"],
-    "Pantry": ["Wynwood", "Coquina", "Tamiami", "Biscayne", "Northfield", "True Acre", "Fernwood", "Oakline", "Stillwater", "Goldenrod", "Juniper Lane"],
-    "Snacks": ["Wynwood", "Mangrove", "Poinciana", "Oakline", "Kindred Field", "Bright Furrow", "Harbor Hill", "Stillwater", "Northfield"],
-    "Beverages & Juices": ["Seagrape", "Biscayne", "Coquina", "Wynwood", "Clearspring", "Stillwater", "Juniper Lane", "Goldenrod"],
-    "Supplements": ["Wildroot", "Mangrove", "Sawgrass", "Clearspring", "Fernwood", "Juniper Lane", "True Acre", "Aster & Oak"],
-    "Beauty & Body": ["Coquina", "Poinciana", "Seagrape", "Fernwood", "Aster & Oak", "Juniper Lane", "Oakline", "Goldenrod"],
+    "Produce": ["Greenway", "Redfield", "Mangrove", "Silverleaf", "True Acre", "Sunhaven", "Kindred Field", "Bright Furrow"],
+    "Meat & Seafood": ["Kestrel", "Cobblestone", "Tallgrass", "Harbor Hill", "True Acre", "Kindred Field", "Stillwater"],
+    "Dairy & Eggs": ["Silverleaf", "Redfield", "Meadowlark", "Clearspring", "Goldenrod", "Kindred Field", "Oakline"],
+    "Pantry": ["Wrenwood", "Cobblestone", "Tallgrass", "Greenway", "Northfield", "True Acre", "Fernwood", "Oakline", "Stillwater", "Goldenrod", "Juniper Lane"],
+    "Snacks": ["Wrenwood", "Mangrove", "Primrose", "Oakline", "Kindred Field", "Bright Furrow", "Harbor Hill", "Stillwater", "Northfield"],
+    "Beverages & Juices": ["Seagrape", "Greenway", "Cobblestone", "Wrenwood", "Clearspring", "Stillwater", "Juniper Lane", "Goldenrod"],
+    "Supplements": ["Wildroot", "Mangrove", "Silverleaf", "Clearspring", "Fernwood", "Juniper Lane", "True Acre", "Aster & Oak"],
+    "Beauty & Body": ["Cobblestone", "Primrose", "Seagrape", "Fernwood", "Aster & Oak", "Juniper Lane", "Oakline", "Goldenrod"],
 }
 
 # category -> [(product, [sizes])]
@@ -34,7 +34,7 @@ PRODUCTS = {
         ("Rainbow Chard", ["bunch"]), ("Organic Honeycrisp Apples", ["each", "3 lb bag"]),
         ("Organic Bananas", ["bunch"]), ("Organic Blueberries", ["6 oz", "pint"]),
         ("Organic Strawberries", ["1 lb"]), ("Raspberries", ["6 oz"]),
-        ("Florida Mangoes", ["each", "2 ct"]), ("Papaya", ["each"]), ("Dragon Fruit", ["each"]),
+        ("Ataulfo Mangoes", ["each", "2 ct"]), ("Papaya", ["each"]), ("Dragon Fruit", ["each"]),
         ("Passion Fruit", ["3 ct"]), ("Key Limes", ["1 lb bag"]), ("Organic Lemons", ["each", "2 lb bag"]),
         ("Organic Sweet Potatoes", ["1 lb"]), ("Organic Carrots", ["2 lb", "bunch"]),
         ("Broccolini", ["bunch"]), ("Organic Cauliflower", ["head"]), ("Zucchini", ["1 lb"]),
@@ -47,7 +47,7 @@ PRODUCTS = {
         ("Sweet Corn", ["2 ct"]), ("Radishes", ["bunch"]), ("Organic Beets", ["bunch"]),
         ("Asparagus", ["bunch"]), ("Haricots Verts", ["12 oz"]), ("Snap Peas", ["8 oz"]),
         ("Cherry Tomatoes", ["pint"]), ("Fennel", ["each"]), ("Organic Limes", ["each"]),
-        ("Avocado, Florida", ["each"]), ("Guava", ["1 lb"]), ("Butter Lettuce", ["head"]),
+        ("Avocado, Green-skin", ["each"]), ("Guava", ["1 lb"]), ("Butter Lettuce", ["head"]),
         ("Cut Watermelon Cup", ["16 oz"]), ("Cut Mango Cup", ["12 oz"]), ("Cut Cantaloupe Cup", ["16 oz"]),
     ],
     "Meat & Seafood": [
@@ -57,7 +57,7 @@ PRODUCTS = {
         ("Pasture-Raised Chicken Breast", ["1 lb"]), ("Pasture-Raised Chicken Wings", ["2 lb"]),
         ("Heritage Pork Chops", ["1 lb"]), ("Uncured Bacon", ["12 oz"]), ("Lamb Loin Chops", ["12 oz"]),
         ("Ground Bison", ["1 lb"]), ("Wild Gulf Shrimp", ["1 lb"]), ("Wild Salmon Fillet", ["8 oz", "1 lb"]),
-        ("Florida Snapper Fillet", ["1 lb"]), ("Mahi-Mahi Fillet", ["1 lb"]), ("Yellowfin Tuna Steak", ["8 oz"]),
+        ("Red Snapper Fillet", ["1 lb"]), ("Mahi-Mahi Fillet", ["1 lb"]), ("Yellowfin Tuna Steak", ["8 oz"]),
         ("Dry-Packed Sea Scallops", ["8 oz"]), ("Chicken Sausage", ["12 oz"]), ("Grass-Fed Beef Hot Dogs", ["10 oz"]),
         ("Pasture-Raised Ground Turkey", ["1 lb"]), ("Grass-Fed Short Ribs", ["1.5 lb"]),
         ("Whole Branzino", ["each"]), ("Wild Cod Fillet", ["1 lb"]), ("Grass-Fed Skirt Steak", ["1 lb"]),
@@ -194,15 +194,15 @@ SHELF_LIFE_DAYS = {
 # (vendor_id, name, is_local, lead_time_days, min_order_usd, payment_terms, category focus)
 KEY_VENDORS = [
     ("V000", "In-house kitchen", 1, 0, 0, "n/a", "Cafe & Hot Bar"),
-    ("V001", "Biscayne Fresh Co.", 1, 1, 300, "Net 15", "Produce"),
-    ("V002", "Palmetto Ranch Direct", 1, 2, 750, "Net 30", "Meat & Seafood"),
+    ("V001", "Greenway Fresh Co.", 1, 1, 300, "Net 15", "Produce"),
+    ("V002", "Kestrel Ranch Direct", 1, 2, 750, "Net 30", "Meat & Seafood"),
     ("V003", "Wildroot Wellness Supply", 0, 7, 1000, "Net 30", "Supplements"),
     ("V004", "Seagrape Juice Works", 1, 1, 250, "Net 15", "Beverages & Juices"),
     ("V005", "Northfield Pantry Distribution", 0, 5, 1500, "Net 45", "Pantry"),
 ]
 
-VENDOR_WORDS_A = ["Atlantic", "Gulfstream", "Evergreen", "Heron", "Sunline", "Tropic", "Coral", "Harbor",
-                  "Summit", "Riverbend", "Keystone", "Prairie", "Cedar", "Bayfront", "Lighthouse", "Osprey",
+VENDOR_WORDS_A = ["Atlantic", "Glenbrook", "Evergreen", "Heron", "Sunline", "Tropic", "Coral", "Harbor",
+                  "Summit", "Riverbend", "Keystone", "Prairie", "Cedar", "Ridgeway", "Lighthouse", "Osprey",
                   "Magnolia", "Blue Marlin", "Sandbar", "Cypress"]
 VENDOR_WORDS_B = ["Organics", "Provisions", "Natural Foods", "Supply Co.", "Distributors", "Wholesale",
                   "Trading Co.", "Botanicals", "Brands", "Growers"]

@@ -42,7 +42,7 @@ Run 2026-09-29 00:13, 40 golden questions asked as the Owner (all stores). LLM m
 | d01 | documents | What is the minimum order for Wildroot Wellness Supply? | documents |  | ✅ |
 | d02 | documents | What are Northfield's payment terms? | documents |  | ✅ |
 | d03 | documents | Can we return unopened supplements to Wildroot? | documents |  | ✅ |
-| d04 | documents | What happens if meat from Palmetto arrives warm? | documents |  | ✅ |
+| d04 | documents | What happens if meat from Kestrel arrives warm? | documents |  | ✅ |
 | d05 | documents | When do cold-pressed juices get pulled? | documents |  | ✅ |
 | d06 | documents | When should produce be marked down? | documents |  | ❌ |
 | d07 | documents | What's the markdown limit without approval? | documents |  | ✅ |

@@ -31,7 +31,8 @@ DEFINITIONS = """
 - waste % = SUM(waste_cost) / SUM(cogs of perishable SKUs) for the same period, as a percent (target: under 3%)
 - average basket = SUM(revenue) / SUM(transactions) from transactions_daily
 - member share = SUM(member_transactions) / SUM(transactions)
-- local brand share = revenue of SKUs with is_local_brand = 1 / total revenue
+- local brand share = revenue of SKUs with is_local_brand = 1 / revenue of all mapped SKUs (product revenue,
+  which leaves out unmapped POS codes), as a percent
 - "last week" / "last N days" are relative to (SELECT MAX(sale_date) FROM sales_daily), never date('now').
   Example: sale_date > date((SELECT MAX(sale_date) FROM sales_daily), '-7 days')
 - A product can have several POS codes: always aggregate by master_sku_id, never by local_sku.

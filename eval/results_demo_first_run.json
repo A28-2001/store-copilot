@@ -321,7 +321,7 @@
     {
       "id": "d04",
       "kind": "documents",
-      "question": "What happens if meat from Palmetto arrives warm?",
+      "question": "What happens if meat from Kestrel arrives warm?",
       "expected_route": "documents",
       "route": "documents",
       "latency_ms": 1,

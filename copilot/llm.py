@@ -43,14 +43,16 @@ def make_llm(api_key: str, callbacks: list | None = None):
     return chat(PRIMARY_MODEL).with_fallbacks([chat(FALLBACK_MODEL)])
 
 
-def check_key(api_key: str) -> tuple[bool, str]:
-    """Ask Groq to list models (free, no tokens). Returns (works, message for the sidebar)."""
+def check_key(api_key: str) -> tuple[bool | None, str]:
+    """Ask Groq to list models (free, no tokens). Returns (works, message for the sidebar);
+    works is None when Groq couldn't be reached, so the caller can try again later."""
     try:
         from groq import Groq
         ids = {m.id for m in Groq(api_key=api_key, timeout=8.0, max_retries=0).models.list().data}
     except Exception as err:  # 401 bad key, network down, ...
-        status = getattr(err, "status_code", None)
-        return False, "Groq rejected that key." if status in (401, 403) else f"Couldn't reach Groq ({type(err).__name__})."
+        if getattr(err, "status_code", None) in (401, 403):
+            return False, "Groq rejected that key."
+        return None, f"Couldn't reach Groq ({type(err).__name__})."
     if PRIMARY_MODEL not in ids and FALLBACK_MODEL not in ids:
         return False, f"The key works, but {PRIMARY_MODEL} isn't available on it."
     return True, "Key works."

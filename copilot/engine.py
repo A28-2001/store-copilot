@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any, TypedDict
 
 import pandas as pd
+import sqlglot
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -85,7 +86,7 @@ refuse    - asks to change, delete or update data, or has nothing to do with run
 
 Examples:
 Q: Which categories are below their margin target this month? -> numbers
-Q: What are the return terms in the Palmetto agreement? -> documents
+Q: What are the return terms in the Kestrel agreement? -> documents
 Q: Which vendors do we need to order from, and what are their payment terms? -> both"""),
     ("human", "Q: {question} ->"),
 ])
@@ -120,7 +121,8 @@ of joins, julianday() arithmetic instead of date(), a different aggregation path
 SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are a grocery operations analyst writing for a store manager.
 Answer the question in 1 to 3 plain sentences using ONLY numbers that appear in the query result.
-Name stores like "Flagship (S1)". Write money like $1,912 and large counts with commas.
+Name stores like "Flagship (S1)". Write money rounded to whole dollars, like $1,912, and large counts with commas.
+Say what period the numbers cover when the query has a date filter (for example "in the last 30 days").
 Answer only the data part; any policy part is answered separately. No markdown, no invented numbers."""),
     ("human", "Question: {question}\n\nQuery result ({rows} rows, showing up to 25), CSV:\n{csv}"),
 ])
@@ -204,13 +206,26 @@ def detect_stores(question: str) -> list[str]:
     return found
 
 
+SQL_START = re.compile(r"\bselect\b|\bwith\s+(recursive\s+)?\w+\s*(\([^)]*\))?\s*as\s*\(", re.I)
+
+
 def clean_sql(text: str) -> str:
-    """Strip markdown fences and chatter; keep one statement starting at SELECT/WITH."""
-    text = re.sub(r"```(?:sql)?", "", text, flags=re.I).strip()
-    m = re.search(r"\b(with|select)\b", text, flags=re.I)
-    if m:
-        text = text[m.start():]
-    return text.split(";")[0].strip()
+    """Strip markdown fences and chatter; keep one statement starting at SELECT or WITH name AS (."""
+    text = re.sub(r"```(?:sql)?", "", text or "", flags=re.I).strip()
+    m = SQL_START.search(text)
+    if m is None:
+        return ""
+    return text[m.start():].split(";")[0].strip()
+
+
+def same_query(a: str | None, b: str | None) -> bool:
+    """True when two queries are the same once formatting is ignored."""
+    def norm(sql: str) -> str:
+        try:
+            return sqlglot.parse_one(sql, read="sqlite").sql(dialect="sqlite", normalize=True)
+        except sqlglot.errors.SqlglotError:
+            return " ".join(sql.lower().split())
+    return bool(a and b) and norm(a) == norm(b)
 
 
 def guess_chart(df: pd.DataFrame) -> dict | None:
@@ -221,7 +236,7 @@ def guess_chart(df: pd.DataFrame) -> dict | None:
     date_col = next((c for c in cols if "date" in c.lower() or c.lower() in ("day", "week", "month")), None)
     if date_col and numeric:
         return {"type": "line", "x": date_col, "y": numeric[0], "color": "store" if "store" in cols else None}
-    label = next((c for c in cols if df[c].dtype == object), None)
+    label = next((c for c in cols if not pd.api.types.is_numeric_dtype(df[c])), None)
     if label and numeric and 2 <= len(df) <= 30:
         return {"type": "bar", "x": label, "y": numeric[0]}
     return None
@@ -295,9 +310,6 @@ class Copilot:
             docs_text=state.get("docs_text"), trace=state.get("trace", []),
             latency_ms=(time.perf_counter() - t0) * 1000)
 
-    def mermaid(self) -> str:
-        return self.graph.get_graph().draw_mermaid()
-
     # -- graph -----------------------------------------------------------------
     def _build_graph(self):
         g = StateGraph(CopilotState)
@@ -308,7 +320,9 @@ class Copilot:
         g.add_conditional_edges("screen", lambda s: "refuse" if s.get("route") == "refuse" else "route",
                                 ["refuse", "route"])
         g.add_conditional_edges("route", self._after_route, ["write_sql", "retrieve", "refuse"])
-        g.add_conditional_edges("write_sql", lambda s: "run_sql" if s.get("sql") else "explain",
+        # An LLM reply with no SQL still goes to run_sql, which rejects it and sends it back for one retry.
+        g.add_conditional_edges("write_sql",
+                                lambda s: "run_sql" if s.get("sql") or s.get("numbers_mode") == "llm" else "explain",
                                 ["run_sql", "explain"])
         g.add_conditional_edges("run_sql", self._after_run, ["verify", "write_sql", "explain"])
         g.add_edge("verify", "explain")
@@ -362,6 +376,10 @@ class Copilot:
                 if route == "numbers":
                     return {**update, "route": "refuse", "route_reason": "store access", "answer": outside}
                 update.update(route="documents", notes=[outside])  # still answer the policy half
+            outside_ids = [s for s in mentioned if s not in self.allowed]
+            if outside_ids and allowed_mentioned:
+                update["notes"] = [f"{', '.join(config.store_label(s) for s in outside_ids)} is outside your store "
+                                   f"access, so this covers {', '.join(config.store_label(s) for s in allowed_mentioned)} only."]
             picker = [s for s in state.get("picker", []) if s in self.allowed]
             scope = allowed_mentioned or picker or self.allowed
             update.update(scope=scope, mentioned=allowed_mentioned)
@@ -393,8 +411,8 @@ class Copilot:
         prepared = templates.prepare(template, state["question"], state["scope"])
         if prepared.problem:
             return {**base, "sql": None, "numbers_text": prepared.problem, "template_id": template.id}
-        return {**base, "sql": prepared.sql, "check_sql": prepared.check_sql, "prepared": prepared,
-                "template_id": template.id}
+        shown = "\n\n".join(sql for sql, _ in prepared.checks)
+        return {**base, "sql": prepared.sql, "check_sql": shown, "prepared": prepared, "template_id": template.id}
 
     def _write_sql_llm(self, state: CopilotState) -> dict:
         retry = ""
@@ -418,14 +436,18 @@ class Copilot:
         db = StoreDB(state["scope"], db_path=self.db_path)
         result: QueryResult = state["result"]
         if state.get("numbers_mode") == "demo":
-            t = templates.BY_ID[state["template_id"]]
-            return {"verification": verify_template(db, state["check_sql"], t.check_of, result.df, result.truncated),
+            p = state["prepared"]
+            return {"verification": verify_template(db, p.check_sql, p.template.check_of, result.df, result.truncated,
+                                                    p.more_checks),
                     "trace": ["verify"]}
         other, error, check_sql = None, None, None
         try:
             raw = (CHECK_PROMPT | self.llm | StrOutputParser()).invoke({
                 "schema": schema_notes(state["scope"]), "question": state["question"], "sql": state["sql"]})
             check_sql = clean_sql(raw)
+            if same_query(check_sql, state["sql"]):
+                return {"verification": verify_frames(result.df, None, truncated=result.truncated, identical=True),
+                        "check_sql": check_sql, "trace": ["verify"]}
             other = db.run(check_sql).df
         except QueryError as err:
             error = str(err)
@@ -442,7 +464,8 @@ class Copilot:
         if result is None:
             if state.get("numbers_text"):
                 return update  # demo no-match or a scope problem, already worded
-            return {**update, "numbers_text": f"I couldn't answer that from the data: {state.get('sql_error')}"}
+            reason = state.get("sql_error") or "no query came back"
+            return {**update, "numbers_text": f"I couldn't answer that from the data: {reason}"}
         df = result.df
         if state.get("numbers_mode") == "demo":
             prepared = state["prepared"]
@@ -451,7 +474,7 @@ class Copilot:
             text = (SUMMARY_PROMPT | self.llm | StrOutputParser()).invoke({
                 "question": state["question"], "rows": len(df), "csv": df.head(25).to_csv(index=False)}).strip()
         except Exception:
-            text = f"Here is what the data shows ({len(df)} rows)."
+            text = f"Here is what the data shows ({len(df)} row{'' if len(df) == 1 else 's'})."
         return {**update, "numbers_text": text, "chart": guess_chart(df)}
 
     def _retrieve(self, state: CopilotState) -> dict:

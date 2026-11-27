@@ -164,7 +164,7 @@ NO_DOCUMENT = "No current document covers that."
 
 
 def doc_name(doc: Document) -> str:
-    """'the Biscayne Fresh Co. agreement' or 'the Perishables and Waste SOP'."""
+    """'the Greenway Fresh Co. agreement' or 'the Perishables and Waste SOP'."""
     title = doc.metadata.get("title", "")
     if doc.metadata.get("doc_type") == "vendor_agreement":
         title = title.replace("Vendor Agreement: ", "") + " agreement"

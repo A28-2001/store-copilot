@@ -32,7 +32,8 @@ def run_panel(template_id: str, scope: list[str], question: str | None = None) -
         result = db.run(prepared.sql)
     except QueryError as err:
         return Panel(template_id, question, pd.DataFrame(), None, str(err), str(err))
-    verification = verify_template(db, prepared.check_sql, t.check_of, result.df, result.truncated)
+    verification = verify_template(db, prepared.check_sql, t.check_of, result.df, result.truncated,
+                                   prepared.more_checks)
     return Panel(template_id, question, result.df, verification, templates.summarize(prepared, result.df))
 
 
@@ -51,7 +52,7 @@ def kpis(p: dict[str, Panel]) -> list[dict]:
     if not rev.df.empty:
         total = rev.df["revenue"].sum()
         gm = (rev.df["revenue"] * rev.df["gross_margin_pct"]).sum() / total
-        out.append(dict(label="Revenue, last 30 days", value=_money(total), sub=f"{len(rev.df)} store(s)",
+        out.append(dict(label="Revenue, last 30 days", value=_money(total), sub=f"{len(rev.df)} store" + ("" if len(rev.df) == 1 else "s"),
                         status=rev.verification.status, tone="neutral"))
         out.append(dict(label="Gross margin", value=f"{gm:.1f}%", sub="blended across categories",
                         status=rev.verification.status, tone="neutral"))
@@ -83,7 +84,8 @@ def brief(p: dict[str, Panel]) -> list[dict]:
     if not prices.empty:
         below = int((prices["issue"] == "Price below cost").sum())
         items.append(dict(kind="Pricing", headline=f"{len(prices)} prices need a decision",
-                          detail=f"{below} are below cost, {len(prices) - below} lost margin after a vendor cost increase.",
+                          detail=f"{below} are below cost, {len(prices) - below} are under the margin floor after a vendor "
+                                 "cost increase.",
                           question="Which prices fell under the margin floor?"))
     app = p["app_sync"].df
     if not app.empty:

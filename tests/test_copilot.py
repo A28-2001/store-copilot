@@ -70,12 +70,15 @@ def test_template_example_matches_and_verifies(template):
     assert matched is template, f"'{template.example}' matched {matched and matched.id}"
     db = StoreDB(ALL_STORES)
     prepared = templates.prepare(template, template.example, ALL_STORES)
-    t0 = time.perf_counter()
-    result = db.run(prepared.sql)
-    verification = verify_template(db, prepared.check_sql, template.check_of, result.df, result.truncated)
-    elapsed = time.perf_counter() - t0
+    elapsed = []
+    for _ in range(2):  # the faster of two runs, so a busy machine doesn't fail the test
+        t0 = time.perf_counter()
+        result = db.run(prepared.sql)
+        verification = verify_template(db, prepared.check_sql, template.check_of, result.df, result.truncated,
+                                       prepared.more_checks)
+        elapsed.append(time.perf_counter() - t0)
     assert verification.status == "verified", verification.checks
-    assert elapsed < 0.5, f"{template.id} took {elapsed:.2f}s"
+    assert min(elapsed) < 0.5, f"{template.id} took {min(elapsed):.2f}s"
     assert templates.summarize(prepared, result.df)
 
 
@@ -86,6 +89,17 @@ def test_silent_error_is_caught_by_independent_check():
     prepared = templates.prepare(t, t.example, ALL_STORES)
     wrong = db.run(prepared.sql.replace("ROUND(SUM(s.revenue), 2) AS revenue", "ROUND(SUM(s.revenue) * 2, 2) AS revenue"))
     assert verify_template(db, prepared.check_sql, t.check_of, wrong.df).status == "disagree"
+
+
+def test_wrong_margin_is_caught_even_when_revenue_is_right():
+    """Revenue checks out but the margin column is doubled: the margin's own check must catch it."""
+    db = StoreDB(ALL_STORES)
+    t = templates.BY_ID["revenue_by_store"]
+    prepared = templates.prepare(t, t.example, ALL_STORES)
+    wrong = db.run(prepared.sql.replace("ROUND(100.0 * SUM(s.revenue - s.cogs)", "ROUND(200.0 * SUM(s.revenue - s.cogs)"))
+    verification = verify_template(db, prepared.check_sql, t.check_of, wrong.df, more=prepared.more_checks)
+    assert verification.status == "disagree"
+    assert [c.passed for c in verification.checks if c.name.startswith("Independent")] == [True, False]
 
 
 def test_compare_frames_tolerance():
@@ -102,9 +116,9 @@ RETRIEVER = BM25DocRetriever.from_directory()
 
 
 @pytest.mark.parametrize("question,title,section", [
-    ("What's the minimum order for Palmetto Ranch?", "Vendor Agreement: Palmetto Ranch Direct", "Minimum order and payment terms"),
+    ("What's the minimum order for Kestrel Ranch?", "Vendor Agreement: Kestrel Ranch Direct", "Minimum order and payment terms"),
     ("How long can hot bar food sit out before we discard it?", "Perishables and Waste SOP", "Hot bar"),
-    ("What credit do we get from Biscayne for damaged produce?", "Vendor Agreement: Biscayne Fresh Co.", "Returns and credits"),
+    ("What credit do we get from Greenway for damaged produce?", "Vendor Agreement: Greenway Fresh Co.", "Returns and credits"),
     ("What happens to unsold Seagrape juice?", "Vendor Agreement: Seagrape Juice Works", "Returns and credits"),
 ])
 def test_retriever_finds_right_section(question, title, section):
@@ -114,10 +128,10 @@ def test_retriever_finds_right_section(question, title, section):
 
 
 def test_retriever_ignores_superseded_unless_asked():
-    current = RETRIEVER.invoke("What's the minimum order for Palmetto Ranch?")
+    current = RETRIEVER.invoke("What's the minimum order for Kestrel Ranch?")
     assert all(d.metadata["status"] == "current" for d in current)
     assert "$750" in current[0].page_content
-    old = RETRIEVER.invoke("What was the minimum order in the old Palmetto agreement?")
+    old = RETRIEVER.invoke("What was the minimum order in the old Kestrel agreement?")
     assert old[0].metadata["status"] == "superseded" and "$500" in old[0].page_content
 
 
@@ -181,7 +195,6 @@ def test_buttons_use_the_question_library_even_with_a_model():
 
 
 # --------------------------------------------------------------------------- LLM path with a fake model (no key)
-from langchain_core.language_models.fake_chat_models import FakeListChatModel  # noqa: E402
 
 REVENUE_SQL = """SELECT st.name || ' (' || st.store_id || ')' AS store, ROUND(SUM(s.revenue), 2) AS revenue
 FROM sales_daily s JOIN stores st ON st.store_id = s.store_id

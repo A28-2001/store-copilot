@@ -1,5 +1,5 @@
 ---
-title: "Vendor Agreement: Palmetto Ranch Direct"
+title: "Vendor Agreement: Kestrel Ranch Direct"
 doc_type: vendor_agreement
 vendor_id: V002
 store_scope: all
@@ -19,4 +19,4 @@ The minimum order is $750 per store per delivery. Payment terms are Net 30 from 
 Any product that arrives above 40°F is refused at the door and credited in full. Product delivered with fewer than 3 days to its sell-by date is also credited in full.
 
 ## Volume rebate
-Palmetto pays a 3% rebate on any month in which purchases across all stores exceed $25,000. The rebate is paid as a credit on the first invoice of the next month.
+Kestrel pays a 3% rebate on any month in which purchases across all stores exceed $25,000. The rebate is paid as a credit on the first invoice of the next month.

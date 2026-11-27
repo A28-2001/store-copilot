@@ -10,6 +10,7 @@ Run:  python data/generate.py            (seed 7, reproducible)
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import sqlite3
@@ -29,6 +30,14 @@ import catalog  # noqa: E402
 
 CONFIG_PATH = ROOT / "config" / "stores.yaml"
 DB_PATH = ROOT / "data" / "store.db"
+# A database built from older versions of these files is rebuilt (see ensure_db).
+SOURCE_FILES = (Path(__file__).resolve(), ROOT / "data" / "catalog.py", CONFIG_PATH)
+
+
+def source_stamp() -> int:
+    """A fingerprint of the files the database is built from, stored as SQLite's user_version."""
+    digest = hashlib.sha256(b"".join(p.read_bytes() for p in SOURCE_FILES)).hexdigest()
+    return int(digest[:7], 16)
 
 N_SKUS = 2000
 DOW_FACTOR = np.array([0.9, 0.85, 0.9, 0.95, 1.1, 1.35, 1.25])  # Mon..Sun
@@ -487,6 +496,7 @@ def generate(seed: int = 7, db_path: Path = DB_PATH, verbose: bool = True) -> di
     for name, df in tables.items():
         df.to_sql(name, con, if_exists="append", index=False)
     con.executescript(VELOCITY_VIEW + ";" + INDEXES + "ANALYZE;")
+    con.execute(f"PRAGMA user_version = {source_stamp()}")
     con.commit()
     con.close()
 
@@ -564,14 +574,16 @@ EXPECTED_TABLES = set(re.findall(r"CREATE TABLE (\w+)", SCHEMA)) | {"sku_velocit
 
 
 def _is_complete(db_path: Path) -> bool:
-    """True if the file has every table and view and some sales (a half-built file does not)."""
+    """True if the file has every table and view, some sales (a half-built file does not), and was
+    built from the current generator and config (after a change, it is rebuilt)."""
     if not db_path.exists():
         return False
     try:
         con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         try:
             names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")}
-            return EXPECTED_TABLES <= names and con.execute("SELECT COUNT(*) FROM sales_daily").fetchone()[0] > 0
+            return (EXPECTED_TABLES <= names and con.execute("SELECT COUNT(*) FROM sales_daily").fetchone()[0] > 0
+                    and con.execute("PRAGMA user_version").fetchone()[0] == source_stamp())
         finally:
             con.close()
     except sqlite3.Error:
@@ -579,7 +591,8 @@ def _is_complete(db_path: Path) -> bool:
 
 
 def ensure_db(db_path: Path = DB_PATH) -> Path:
-    """Build the database on first run (it is git-ignored).
+    """Build the database on first run (it is git-ignored), and again whenever the files it is
+    built from change.
 
     Only one build runs at a time, and it writes to a temporary file that is swapped
     into place in one step, so no session ever opens a half-built database.

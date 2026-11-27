@@ -13,7 +13,7 @@ def test_story_carries_the_checked_numbers():
     assert money(f["sales_now"]) in page
     assert page.count('class="step"') == 4 and page.count('class="fig"') == 4
     assert page.count("data-goto=") == 4
-    assert "—" not in page
+    assert "\u2014" not in page
 
 
 def test_plan_numbers_come_from_the_workbook():

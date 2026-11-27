@@ -8,16 +8,18 @@ Writes planning/board_pack.pptx: three slides, one message each.
     2. Margin leaks, in dollars
     3. Stock and waste
 
-Nothing on the slides is typed by hand. Every number is worked out two ways
-(different tables or a different formulation) and the build stops if the two
-disagree by more than 0.5%, the same idea as the Copilot's verifier. Run it
-again when the month closes and the pack rebuilds itself.
+Nothing on the slides is typed by hand. Every dollar total, rate and day count
+is worked out two ways (different tables or a different formulation) and the
+build stops if the two disagree by more than 0.5%, the same idea as the
+Copilot's verifier. Item counts come from one query each. Run it again when
+the month closes and the pack rebuilds itself.
 
 The PDF next to it was exported from the .pptx with LibreOffice.
 """
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from pptx import Presentation
@@ -30,7 +32,8 @@ from pptx.util import Inches, Pt
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from copilot.figures import DAYS, WASTE_TARGET, figures, money  # noqa: E402,F401
+from copilot import config  # noqa: E402
+from copilot.figures import PACE_DAYS, WASTE_TARGET, figures, money  # noqa: E402
 
 OUT = ROOT / "planning" / "board_pack.pptx"
 
@@ -64,8 +67,8 @@ def frame(prs, f, n, headline):
     text(slide, 0.6, 0.35, 9, 0.3, f"BOARD PACK  ·  30 DAYS TO {f['end']:%b %d, %Y}".upper(), size=10,
          color=BRIGHT, bold=True)
     text(slide, 0.6, 0.65, 12.1, 1.2, headline, size=28, font="Georgia")
-    text(slide, 0.6, 7.0, 10.5, 0.3, "Made-up data. Every number on this page is worked out two ways before it's "
-                                      "printed. Built by planning/build_board_pack.py.", size=9, color=MUTED)
+    text(slide, 0.6, 7.0, 10.5, 0.3, "Made-up data. Every dollar figure on this page is worked out two ways before "
+                                      "it's printed. Built by planning/build_board_pack.py.", size=9, color=MUTED)
     text(slide, 12.2, 7.0, 0.5, 0.3, str(n), size=9, color=MUTED, align=PP_ALIGN.RIGHT)
     return slide
 
@@ -121,7 +124,10 @@ def build(out: Path = OUT) -> Path:
     same = f["same_now"] / f["same_before"] - 1
     waste_pct = f["waste"] / f["perishable_cogs"]
     trend = "flat" if abs(same) < 0.01 else f"{same:+.0%}"
-    s = frame(prs, f, 1, f"Sales grew {growth:.0%}, all of it from the new store. Margin held; waste is "
+    newest = config.store_by_id(config.newest_store())["name"]
+    share = (dict(f["stores_now"])[newest] - dict(f["stores_before"]).get(newest, 0)) / (f["sales_now"] - f["sales_before"])
+    who = "all" if share >= 0.995 else ("almost all" if share >= 0.9 else f"{share:.0%}")
+    s = frame(prs, f, 1, f"Sales grew {growth:.0%}, {who} of it from the new store. Margin held; waste is "
                          f"the problem to fix.")
     tiles = [("Sales", money(f["sales_now"]), f"{growth:+.0%} vs the 30 days before; {trend} at the "
                                               f"{f['same_stores']} stores open both times"),
@@ -132,11 +138,11 @@ def build(out: Path = OUT) -> Path:
         tile(s, 0.6 + i * 3.07, 1.95, 2.87, 1.8, label, value, note)
     text(s, 0.6, 4.15, 12, 0.4, "Three things to act on", size=16, bold=True)
     actions = [
-        ("Cut waste. ", f"It runs about {money(f['leak_waste'])} a year above target, and "
-                       f"{f['waste_cafe'] / f['waste']:.0%} of it is the cafe and hot bar."),
+        ("Cut waste. ", f"It runs about {money(f['leak_waste'])} a year above target, and the cafe and hot bar "
+                       f"are {f['waste_cafe'] / f['waste']:.0%} of all waste."),
         ("Fix pricing. ", f"{f['leak_price_items']} prices are keyed below cost and {f['leak_cost_items']} vendor "
                          f"cost increases were never passed on: {money(f['leak_price'] + f['leak_cost'])} a year."),
-        ("Pull failed items. ", f"{f['fail_sales_items']} items that fail the clean standard are still selling, "
+        ("Pull failed items. ", f"{f['fail_sales_items']} Fail items sold in the last {PACE_DAYS} days, about "
                                f"{money(f['fail_sales'])} a year of sales that put the brand at risk."),
     ]
     text(s, 0.6, 4.6, 12.1, 2.2, [[(f"{i}.  ", {"bold": True, "color": BRIGHT}), (lead, {"bold": True}), body]
@@ -145,15 +151,15 @@ def build(out: Path = OUT) -> Path:
     # 2. Margin leaks, in dollars
     total = f["leak_waste"] + f["leak_price"] + f["leak_cost"]
     s = frame(prs, f, 2, f"About {money(total)} a year is leaking from margin, {total / f['sales_year']:.1%} of "
-                         f"sales. Most of it is waste, and all of it can be fixed.")
+                         f"sales. Most of it is waste, and each part has a known fix.")
     text(s, 0.6, 1.85, 7, 0.4, "What each leak costs a year, at today's pace", size=13, color=MUTED)
     bar_chart(s, 0.4, 2.2, 7.4, 3.0, ["Waste above the 3% target", "Prices keyed below cost",
                                       "Cost increases not passed on"],
               [("Per year", (round(f["leak_waste"]), round(f["leak_price"]), round(f["leak_cost"])))])
     text(s, 8.3, 1.85, 4.4, 0.4, "What fixes it", size=13, color=MUTED)
     fixes = [
-        [("Waste: ", {"bold": True}), "order perishables closer to their shelf life and make smaller hot bar "
-                                       "batches (page 3)."],
+        [("Waste: ", {"bold": True}), f"make smaller cafe and hot bar batches ({f['waste_cafe'] / f['waste']:.0%} "
+                                       "of all waste) and order fresh food closer to its shelf life (page 3)."],
         [("Prices: ", {"bold": True}), f"correct the {f['leak_price_items']} keying errors today; the app still has "
                                         "the right prices."],
         [("Costs: ", {"bold": True}), f"reprice the {f['reprice_gain_items']} items under the margin floor, worth "
@@ -166,9 +172,9 @@ def build(out: Path = OUT) -> Path:
     box.fill.fore_color.rgb = RGBColor.from_string(TILE)
     box.line.fill.background()
     text(s, 0.85, 5.62, 11.6, 0.9, [[("Not in the total, but bigger: ", {"bold": True}),
-                                     f"{f['fail_sales_items']} items that fail the clean standard still sell "
-                                     f"{money(f['fail_sales'])} a year. Pulling them costs those sales, and keeping "
-                                     "them costs the brand."]], size=14, anchor=MSO_ANCHOR.MIDDLE)
+                                     f"{f['fail_sales_items']} Fail items sold in the last {PACE_DAYS} days, about "
+                                     f"{money(f['fail_sales'])} a year at that pace. Pulling them costs those sales, "
+                                     "and keeping them costs the brand."]], size=14, anchor=MSO_ANCHOR.MIDDLE)
 
     # 3. Stock and waste
     names = [c[0].replace("Beverages & Juices", "Juices and drinks") for c in f["over_life"]]
@@ -191,8 +197,10 @@ def build(out: Path = OUT) -> Path:
         text(s, 8.3, y + 0.9, 4.4, 0.4, note, size=12, color=MUTED)
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    prs.core_properties.title = "Board pack"
-    prs.core_properties.author = "Store Copilot"
+    props = prs.core_properties  # python-pptx's template otherwise carries its own 2013 author and dates
+    props.title, props.author, props.last_modified_by, props.revision = "Board pack", "Store Copilot", "Store Copilot", 1
+    props.created = props.modified = datetime(f["end"].year, f["end"].month, f["end"].day)
+    props.comments = props.subject = props.keywords = ""
     prs.save(out)
     print(f"{f.checks} numbers checked two ways")
     return out

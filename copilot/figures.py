@@ -1,4 +1,5 @@
-"""The month's headline numbers, each worked out two ways.
+"""The month's headline numbers. Every dollar total, rate and day count is worked out two ways;
+the item counts (how many prices, cost increases, Fail items) come from one query each.
 
 Shared by the board pack (planning/build_board_pack.py) and the app's Story tab,
 so the slides and the story can never disagree. figures() raises SystemExit if
@@ -20,11 +21,11 @@ def money(x: float) -> str:
 
 
 class Figures(dict):
-    """Numbers for the slides. Each one is checked against a second route before it's stored."""
+    """Numbers for the slides. twice() checks a number against a second route before it's stored."""
 
     def twice(self, key, first, second, tol=0.005):
         first, second = float(first or 0), float(second or 0)
-        if abs(first - second) > tol * max(1.0, abs(first)):
+        if abs(first - second) > max(tol * max(abs(first), abs(second)), 1e-9):  # 0.5% of the larger
             raise SystemExit(f"{key}: the two routes disagree ({first:,.2f} vs {second:,.2f}). Nothing written.")
         self[key] = first
         self.checks = getattr(self, "checks", 0) + 1
@@ -124,6 +125,18 @@ def figures(db: Path = DB_PATH) -> Figures:
             FROM stock JOIN used USING (category) JOIN life USING (category)
             JOIN category_targets t ON t.category = stock.category
             ORDER BY stock.category""").fetchall()
+        # The same three numbers per category by a second route: stock summed store by store, cost of goods
+        # with a julianday window, shelf life as SUM / COUNT.
+        by_category = {name: rest for name, *rest in con.execute(f"""
+            SELECT m.category,
+                   (SELECT SUM(v) FROM (SELECT SUM(i.on_hand * COALESCE(m2.unit_cost, 0)) AS v
+                                        FROM inventory_current i JOIN sku_master m2 ON m2.master_sku_id = i.master_sku_id
+                                        WHERE m2.category = m.category GROUP BY i.store_id)),
+                   (SELECT SUM(s.cogs) FROM sales_daily s WHERE julianday(s.sale_date) > {jd} - {DAYS}
+                      AND s.master_sku_id IN (SELECT master_sku_id FROM sku_master WHERE category = m.category))
+                     / {DAYS}.0,
+                   1.0 * SUM(m.shelf_life_days) / COUNT(m.shelf_life_days)
+            FROM sku_master m GROUP BY m.category""")}
         slow = f"i.on_hand > 0 AND (COALESCE(s.u, 0) = 0 OR i.on_hand * {DAYS}.0 / s.u > {SLOW_DAYS})"
         sold = (f"(SELECT store_id, master_sku_id, SUM(units) AS u FROM sales_daily WHERE sale_date > {last} "
                 "AND master_sku_id IS NOT NULL GROUP BY 1, 2)")
@@ -140,7 +153,13 @@ def figures(db: Path = DB_PATH) -> Figures:
     finally:
         con.close()
     stocked = [c for c in f["categories"] if c[1] > 0]
-    f["stock_days"] = f["stock"] / sum(c[2] for c in stocked)
+    f.twice("stock_days", f["stock"] / sum(c[2] for c in stocked),
+            f["stock"] / sum(by_category[c[0]][1] for c in stocked))
     f["over_life"] = [c for c in stocked if c[4] and c[1] / c[2] > c[3]]
-    f["cash_freed"] = sum(c[1] - c[3] * c[2] for c in f["over_life"])
+    for name, stock, per_day, life, _ in f["over_life"]:
+        other_stock, other_per_day, other_life = by_category[name]
+        f.twice(f"days_of_stock:{name}", stock / per_day, other_stock / other_per_day)
+        f.twice(f"shelf_life:{name}", life, other_life)
+    f.twice("cash_freed", sum(c[1] - c[3] * c[2] for c in f["over_life"]),
+            sum(by_category[c[0]][0] - by_category[c[0]][2] * by_category[c[0]][1] for c in f["over_life"]))
     return f

@@ -10,6 +10,7 @@ import html
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -65,9 +66,9 @@ MORE_QUESTIONS = {
     "Store 3 assortment gap": "Which flagship top sellers aren't carried at Store 3?",
     "Daily trend": "Show me the daily revenue trend by store.",
     "How did Store 3 do?": "How did store 3 do last week?",
-    "Palmetto minimum order": "What's the minimum order for Palmetto Ranch?",
+    "Kestrel minimum order": "What's the minimum order for Kestrel Ranch?",
     "Hot bar discard rule": "How long can hot bar food sit out before we discard it?",
-    "Damaged produce credit": "What credit do we get from Biscayne for damaged produce?",
+    "Damaged produce credit": "What credit do we get from Greenway for damaged produce?",
     "Unsold juice": "What happens to unsold Seagrape juice?",
 }
 
@@ -88,6 +89,10 @@ h1, h2, h3 {letter-spacing: -0.01em;}
 .hero .chips span {border: 1px solid rgba(243,238,228,.22); border-radius: 999px; padding: 4px 12px;
        font-size: .78rem; color: #EDE7DB; background: rgba(255,255,255,.04);}
 .hero .chips b {color: #FFFFFF; font-weight: 600;}
+/* On the Story tab the story has its own headline, so the hero shrinks to one line. */
+.hero.compact {padding: 16px 24px 16px;}
+.hero.compact h1 {font-size: 1.3rem; margin: .3rem 0 .1rem;} .hero.compact h1 br {display: none;}
+.hero.compact p, .hero.compact:after {display: none;} .hero.compact .chips {margin-top: 10px;}
 .kpi {background: #FFFFFF; border: 1px solid #E6DFD3; border-radius: 12px; padding: 16px 18px 14px; height: 100%;}
 .kpi-label {color: #6E6A62; font-size: .8rem; font-weight: 500;}
 .kpi-value {font-size: 1.85rem; font-weight: 600; color: #2B2A26; line-height: 1.25; margin-top: 2px;
@@ -159,16 +164,25 @@ def verify_pill(status: str | None) -> str:
     return pill(*VERIFY_PILL[status]) if status in VERIFY_PILL else ""
 
 
+def column_label(col: str) -> str:
+    """'gross_margin_pct' -> 'Gross margin %'."""
+    words = ["%" if w.lower() == "pct" else w for w in col.split("_")]
+    label = " ".join(words)
+    return label[:1].upper() + label[1:]
+
+
 def money_config(df: pd.DataFrame) -> dict:
     cfg = {}
     for c in df.columns:
         lc = c.lower()
-        if lc.endswith("pct") or lc.endswith("_pts"):
-            cfg[c] = st.column_config.NumberColumn(c.replace("_", " "), format="%.1f")
+        if lc.endswith("pct"):
+            cfg[c] = st.column_config.NumberColumn(column_label(c), format="%.1f%%")
+        elif lc.endswith("_pts"):
+            cfg[c] = st.column_config.NumberColumn(column_label(c), format="%.1f")
         elif df[c].dtype.kind == "f" and charts._money_col(c):
-            cfg[c] = st.column_config.NumberColumn(c.replace("_", " "), format="dollar")
+            cfg[c] = st.column_config.NumberColumn(column_label(c), format="dollar")
         else:
-            cfg[c] = st.column_config.Column(c.replace("_", " "))
+            cfg[c] = st.column_config.Column(column_label(c))
     return cfg
 
 
@@ -188,7 +202,19 @@ def get_copilot(allowed: tuple[str, ...], key_fp: str | None, _key: str | None, 
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def key_status(key_fp: str, _key: str) -> tuple[bool, str]:
-    return check_key(_key)
+    works, message = check_key(_key)
+    if works is None:
+        raise ConnectionError(message)  # a network blip isn't cached, so the next run checks again
+    return works, message
+
+
+def key_status_now(key: str | None) -> tuple[bool, str]:
+    if not key:
+        return False, ""
+    try:
+        return key_status(key_fingerprint(key), key)
+    except ConnectionError as err:
+        return False, str(err)
 
 
 @st.cache_data(show_spinner=False)
@@ -262,7 +288,7 @@ with st.sidebar:
         typed_key = st.text_input("Groq API key (optional)", type="password", key="groq_key",
                                   help="Free at console.groq.com. Kept in this browser session only, never stored.")
         key = resolve_key(typed_key)
-        key_ok, key_msg = key_status(key_fingerprint(key), key) if key else (False, "")
+        key_ok, key_msg = key_status_now(key)
         if key and not key_ok:
             where = "" if (typed_key or "").strip() else " (the key found in secrets or the environment)"
             st.caption(f"⚠️ {key_msg[:-1]}{where}. Running in demo mode.")
@@ -276,13 +302,13 @@ with st.sidebar:
     else:
         st.markdown(pill("muted", "Demo mode · no key needed"), unsafe_allow_html=True)
 
-    if PLAN_BOOK.exists():
+    if role == "Owner" and PLAN_BOOK.exists():  # both files cover every store
         st.divider()
         st.markdown("<div class='side-sub'><b>Planning model (Excel)</b><br>New store payback, a 13-week cash "
                     "forecast, inventory and pricing tests.</div>", unsafe_allow_html=True)
         st.download_button("Download the model", PLAN_BOOK.read_bytes(), file_name=PLAN_BOOK.name, key="plan_book",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    if BOARD_PACK.exists():
+    if role == "Owner" and BOARD_PACK.exists():
         st.markdown("<div class='side-sub'><b>Board pack (PDF)</b><br>Three slides, built from the data: the month, "
                     "margin leaks in dollars, stock and waste.</div>", unsafe_allow_html=True)
         st.download_button("Download the board pack", BOARD_PACK.read_bytes(), file_name=BOARD_PACK.name,
@@ -299,14 +325,16 @@ st.session_state.setdefault("nav", TABS[0])
 
 # --------------------------------------------------------------------------- hero
 mode_label = "LLM mode" if llm_on else "Demo mode"
+DATA_END = date.fromisoformat(str(config.load_config()["data_end_date"]))
+compact = " compact" if st.session_state.nav == "Story" and role == "Owner" else ""
 st.markdown(f"""
-<div class="hero">
+<div class="hero{compact}">
   <div class="eyebrow">Store Copilot &nbsp;·&nbsp; synthetic data</div>
-  <h1>Ask your stores anything.<br>Get a checked answer.</h1>
-  <p>Every number is checked by a second query before it's called verified. Every policy answer is quoted
-  from its source.</p>
+  <h1>Ask your stores anything.<br> Get a checked answer.</h1>
+  <p>Every answer is checked by a second, separately written query before it's called Verified. Every policy
+  answer names the section it comes from.</p>
   <div class="chips"><span>Asking as <b>{esc(role)}</b></span><span>Viewing <b>{esc(templates.scope_label(view))}</b></span>
-  <span><b>{mode_label}</b></span></div>
+  <span><b>{mode_label}</b></span><span>Data to <b>{DATA_END:%b} {DATA_END.day}, {DATA_END:%Y}</b></span></div>
 </div>""", unsafe_allow_html=True)
 
 tabs = st.tabs(TABS, key="nav", on_change="rerun")
@@ -345,7 +373,7 @@ with tabs[1]:
         st.write("")
     young = config.low_history_stores(view)
     for s in young:
-        st.markdown(f"<div class='note'>{esc(config.store_label(s))} opened {config.days_of_history(s)} days ago, "
+        st.markdown(f"<div class='note'>{esc(config.store_label(s))} has {config.days_of_history(s)} days of sales, "
                     f"so its trends are low confidence until day {config.load_config()['low_history_days']}.</div>",
                     unsafe_allow_html=True)
 
@@ -387,7 +415,7 @@ def render_answer(a: Answer) -> None:
         st.markdown(f"<div class='q'>{esc(a.question)}</div>", unsafe_allow_html=True)
         status = a.verification.status if a.verification else None
         meta = f"{templates.scope_label(a.scope)} · " if a.scope else ""
-        meta += f"{'LLM' if a.mode == 'llm' else 'demo'} mode · {a.latency_ms / 1000:.1f}s"
+        meta += f"{'query written by the LLM' if a.mode == 'llm' else 'saved query'} · {a.latency_ms / 1000:.1f}s"
         st.markdown(f"<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:center'>{pill(*ROUTE_PILL[a.route])}"
                     f"{verify_pill(status)}<span class='meta'>{esc(meta)}</span></div>", unsafe_allow_html=True)
         st.markdown(f"<div class='answer'>{answer_html(a.text)}</div>", unsafe_allow_html=True)
@@ -403,7 +431,7 @@ def render_answer(a: Answer) -> None:
                                 for i, s in enumerate(a.sources[:1], 1)), unsafe_allow_html=True)
 
         if a.data is not None:
-            label = f"Data · {len(a.data)} rows" + (" (capped at 500)" if a.truncated else "")
+            label = f"Data · {len(a.data)} row" + ("" if len(a.data) == 1 else "s") + (" (capped at 500)" if a.truncated else "")
             with st.expander(label):
                 show_table(a.data, height=min(420, 38 + 35 * len(a.data)))
         if a.sql or a.verification:
@@ -421,7 +449,9 @@ def render_answer(a: Answer) -> None:
                     st.caption("The query:")
                     st.code(a.sql, language="sql")
                 if a.check_sql:
-                    st.caption("The independent query:")
+                    several = a.verification and sum(c.name.startswith("Independent")
+                                                     for c in a.verification.checks) > 1
+                    st.caption("The independent queries:" if several else "The independent query:")
                     st.code(a.check_sql, language="sql")
                 st.caption("Steps: " + " → ".join(STEP_LABELS.get(n, n) for n in a.trace))
         if a.sources:
@@ -589,10 +619,11 @@ with tabs[4]:
     with c2:
         st.markdown("**Numbers go to SQL, policies go to documents.** A database computes a number exactly; a "
                     "language model asked to recall one will guess. A policy is wording, so the job is to find the "
-                    "right section and quote it.")
-        st.markdown(f"**The verifier.** In my [Yardstick]({YARDSTICK_URL}) study, 82-97% of wrong AI-written queries "
-                    "ran without error and returned plausible numbers. So every number here is worked out again by "
-                    "a second, differently written query and must match within 0.5% before it's labelled Verified.")
+                    "right section and answer from it, with a citation.")
+        st.markdown(f"**The verifier.** In my [Yardstick]({YARDSTICK_URL}) study, 93 of the 104 wrong AI-written "
+                    "queries ran without any error. So each answer's key figures (a total, a row count, the top "
+                    "row or a blended rate such as gross margin) are worked out again by a second, differently "
+                    "written query and must match within 0.5% before the answer is labelled Verified.")
 
     st.divider()
     st.subheader("Safety, enforced in code")
@@ -607,7 +638,8 @@ with tabs[4]:
             ("3 · Store scope", "Each connection creates TEMP VIEWs that shadow every store-level table with "
                                 "only your stores, and an authorizer denies any read of the real tables that "
                                 "doesn't come through those views."),
-            ("4 · Budgets", "5 seconds per query and at most 500 rows."),
+            ("4 · Budgets", "5 seconds per query (2 in this box), at most 500 rows, and no single value over "
+                            "1 MB."),
             ("Before any LLM call", "Requests to delete, update or re-price are refused by the first node.")]:
             st.markdown(f"<div class='layer'><b>{esc(title)}</b><br><span class='meta' style='font-size:.85rem'>"
                         f"{esc(body)}</span></div>", unsafe_allow_html=True)
@@ -621,14 +653,17 @@ with tabs[4]:
             try:
                 guard_sql(sql)
                 result = StoreDB(allowed, time_budget_s=2.0).run(sql)
-                if result.df.empty:
+                if result.df.empty and set(allowed) != set(config.store_ids()):
                     st.info(f"It ran, but store scope filtered it: this role only sees "
                             f"{templates.scope_label(allowed)}, so the query found 0 rows. Nothing leaked.")
+                elif result.df.empty:
+                    st.info("It ran and returned no rows.")
                 else:
-                    st.success(f"Allowed: a read-only query inside your access ({len(result.df)} rows).")
+                    st.success(f"Allowed: a read-only query inside your access ({len(result.df)} "
+                               f"row{'' if len(result.df) == 1 else 's'}).")
                     show_table(result.df.head(10))
             except QueryRejected as err:
-                layer = ("layer 4, the time budget" if "longer than" in str(err) else
+                layer = ("layer 4, the budgets" if ("longer than" in str(err) or "over 1 MB" in str(err)) else
                          "layer 3, store scope" if "outside your store access" in str(err) else "layer 2, the SQL guard")
                 st.error(f"Blocked by {layer}: {err}")
             except QueryError as err:
@@ -648,14 +683,17 @@ with tabs[4]:
             values = {m["metric"]: m["value"] for m in r["metrics"]}
             table[label] = [values.get(n, "not measured") for n in names]
         show_table(table)
-        st.caption("In LLM run 2, every answer labelled Verified was correct and both wrong answers were flagged.")
+        st.caption("In LLM run 2, every answer labelled Verified was correct under the answer keys as revised after "
+                   "review (18 of 18), and both wrong answers were flagged. With the keys as first written, 14 of the "
+                   "18 passed.")
         with st.expander("How it was graded"):
             st.markdown("20 number questions, 12 policy, 4 mixed and 4 traps. The first runs exposed gaps (phrasing "
                         "the keyword router didn't know; business conventions the LLM was never told). Those were "
                         "fixed, so the second runs are optimistic. LLM answers are graded against per-question "
                         "answer keys; 'Exact table match' is the strict version, which penalises different but "
                         "valid column choices. 56 of the 121 model calls in run 2 fell back to gpt-oss-20b under "
-                        "free-tier rate limits.")
+                        "free-tier rate limits. Retrieval is the same BM25 search in both modes; the LLM runs came "
+                        "before the Item Setup SOP was added, which moved demo retrieval from 81% to 75%.")
 
     st.divider()
     st.subheader("Limits")

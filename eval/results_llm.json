@@ -366,7 +366,7 @@
     {
       "id": "d04",
       "kind": "documents",
-      "question": "What happens if meat from Palmetto arrives warm?",
+      "question": "What happens if meat from Kestrel arrives warm?",
       "expected_route": "documents",
       "route": "documents",
       "latency_ms": 1378,
@@ -571,5 +571,5 @@
     "openai/gpt-oss-120b": 65,
     "openai/gpt-oss-20b": 56
   },
-  "note": " Re-graded offline with eval/answer_keys.yaml. Re-graded offline with eval/answer_keys.yaml. Re-graded offline with eval/answer_keys.yaml."
+  "note": " Re-graded offline with eval/answer_keys.yaml."
 }

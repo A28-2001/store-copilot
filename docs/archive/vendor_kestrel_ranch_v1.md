@@ -1,5 +1,5 @@
 ---
-title: "Vendor Agreement: Palmetto Ranch Direct"
+title: "Vendor Agreement: Kestrel Ranch Direct"
 doc_type: vendor_agreement
 vendor_id: V002
 store_scope: flagship

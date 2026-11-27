@@ -31,7 +31,8 @@ def store_color(label) -> str:
 
 def _money_col(col: str) -> bool:
     c = col.lower()
-    return any(k in c for k in ("revenue", "cost", "cogs", "usd", "margin", "basket", "sales")) and "pct" not in c
+    return (any(k in c for k in ("revenue", "cost", "cogs", "usd", "margin", "basket", "sales", "price", "dollar"))
+            and "pct" not in c)
 
 
 def _hover_fmt(col: str) -> str:

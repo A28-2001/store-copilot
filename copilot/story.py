@@ -2,7 +2,7 @@
 
 Layered parallax opens each chapter; in the middle, a chart stays pinned while
 four short steps scroll past and the chart changes with them. Every number comes
-from copilot.figures (each worked out two ways), the same source as the board
+from copilot.figures (dollar totals worked out two ways), the same source as the board
 pack, plus the planning model's headline results. The HTML is built here from
 those numbers only; nothing user-supplied reaches it.
 """
@@ -13,9 +13,9 @@ from datetime import date
 from pathlib import Path
 
 from copilot import config
-from copilot.figures import WASTE_TARGET, Figures, money
+from copilot.figures import PACE_DAYS, WASTE_TARGET, Figures, money
 
-INK, GREEN, BRIGHT, MINT, SAND, MUTED = "#1F3A2D", "#2E5E45", "#2E845A", "#A9CDB2", "#CFC8BB", "#6E6A62"
+GREEN, BRIGHT, MINT, SAND = "#2E5E45", "#2E845A", "#A9CDB2", "#CFC8BB"
 
 
 # ----------------------------------------------------------------------------- charts (inline SVG)
@@ -46,13 +46,13 @@ def charts(f: Figures) -> list[tuple[str, str, str]]:
     sales = _bars([("30 days before", [(before, SAND)], money(before)),
                    ("Last 30 days", [(now, BRIGHT)], money(now))], top)
     colors = (GREEN, MINT, BRIGHT)
-    stores = _bars([(label, [(v, colors[j]) for j, (_, v) in enumerate(f[f"stores_{key}"])],
+    stores = _bars([(label, [(v, colors[j % len(colors)]) for j, (_, v) in enumerate(f[f"stores_{key}"])],
                      money(f[f"sales_{key}"]))
                     for label, key in (("30 days before", "before"), ("Last 30 days", "now"))], top)
-    legend = " · ".join(f'<span style="color:{colors[j]}">■</span> {html.escape(name)}'
+    legend = " · ".join(f'<span style="color:{colors[j % len(colors)]}">■</span> {html.escape(name)}'
                         for j, (name, _) in enumerate(f["stores_now"]))
     leaks = [("Waste over target", f["leak_waste"]), ("Prices below cost", f["leak_price"]),
-             ("Cost increases", f["leak_cost"])]
+             ("Costs not passed on", f["leak_cost"])]
     leak = _bars([(label, [(v, BRIGHT if i == 0 else MINT)], money(v)) for i, (label, v) in enumerate(leaks)],
                  max(v for _, v in leaks) * 1.05)
     rows = []
@@ -80,17 +80,22 @@ def build(f: Figures, plan: dict) -> str:
     opened = date.fromisoformat(str(newest["open_date"]))
     leak_total = f["leak_waste"] + f["leak_price"] + f["leak_cost"]
     worst = max(f["over_life"], key=lambda c: c[1] / c[2] - c[3])
+    now, before = dict(f["stores_now"]), dict(f["stores_before"])
+    share = (now[newest["name"]] - before.get(newest["name"], 0)) / (f["sales_now"] - f["sales_before"])
+    who = "All" if share >= 0.995 else (f"Almost all ({share:.0%})" if share >= 0.9 else f"{share:.0%}")
+    end = f["end"]
     drawn = charts(f)
     figs = "".join(f'<figure class="fig" data-i="{i}"><figcaption class="fig-title">{html.escape(t)}</figcaption>'
                    f'{svg}<div class="fig-note">{note}</div></figure>' for i, (t, svg, note) in enumerate(drawn))
     steps = [
         f"<b>{money(f['sales_now'])}</b> in sales over the last 30 days, up <b>{growth:.0%}</b> on the 30 days before.",
         f"But the {f['same_stores']} stores open both months were {'flat' if abs(same) < 0.01 else f'{same:+.0%}'}. "
-        f"All of the growth came from {html.escape(newest['name'])}, which opened on {opened:%B} {opened.day}.",
+        f"{who} of the growth came from {html.escape(newest['name'])}, which opened on {opened:%B} {opened.day}.",
         f"Margin held at <b>{f['gm_now']:.1%}</b>. The money leaks elsewhere: about <b>{money(leak_total)} a year</b> "
         "at today's pace, and most of it is waste.",
-        f"Fresh food holds more stock than it can sell in time. {html.escape(worst[0])} sits for "
-        f"<b>{worst[1] / worst[2]:.0f} days</b> against a {worst[3]:.0f}-day shelf life. That's where the waste starts.",
+        f"Fresh food holds more stock than it can sell in time. {html.escape(worst[0])} holds "
+        f"<b>{worst[1] / worst[2]:.0f} days</b> of stock against a {worst[3]:.0f}-day average shelf life: cash tied "
+        "up in food that may not sell in time.",
     ]
     # On phones the pinned chart is hidden and each step carries its own copy instead.
     step_html = "".join(f'<div class="step" data-i="{i}"><div class="card">{s}<div class="inline-fig">'
@@ -99,15 +104,25 @@ def build(f: Figures, plan: dict) -> str:
     payback = plan.get("payback")
     payback_text = f"pays back in <b>{payback:.0f} months</b>" if isinstance(payback, (int, float)) \
         else "takes more than five years to pay back"
+    if all(plan.get(k) is not None for k in ("payback", "funding", "invest", "sqft")):
+        next_store = f"""<h2>A new store {payback_text}, but needs about {_m(plan["funding"])} of funding before the
+      build starts.</h2>
+      <p>From the planning model: a {plan["sqft"]:,.0f} sq ft store costing about {_m(plan["invest"])}, with the
+      cash it needs week by week. The board pack puts this month on three slides. Both download below.</p>"""
+    else:  # the workbook was rebuilt but not yet recalculated, so it holds formulas without values
+        next_store = """<h2>The planning model sizes the next store.</h2>
+      <p>Its results appear here once the workbook has been recalculated (open and save it in Excel or
+      LibreOffice). The board pack puts this month on three slides. Both download below.</p>"""
     fixes = [
-        ("Cut waste", f"{money(f['leak_waste'])} a year above the {WASTE_TARGET:.0%} target. "
-                      f"{f['waste_cafe'] / f['waste']:.0%} of it is the cafe and hot bar.",
+        ("Cut waste", f"{money(f['leak_waste'])} a year above the {WASTE_TARGET:.0%} target. The cafe and hot "
+                      f"bar are {f['waste_cafe'] / f['waste']:.0%} of all waste.",
          "ask:What is our waste as a percent of perishable cost by store?", "See waste by store"),
         ("Fix pricing", f"{f['leak_price_items']} prices keyed below cost and {f['leak_cost_items']} cost increases "
-                        f"not passed on: {money(f['leak_price'] + f['leak_cost'])} a year.",
+                        f"not passed on: {money(f['leak_price'] + f['leak_cost'])} a year. "
+                        f"{f['reprice_gain_items']} of those prices are now under the margin floor.",
          "master", "See the audit"),
-        ("Pull failed items", f"{f['fail_sales_items']} items that fail the clean standard still sell "
-                              f"{money(f['fail_sales'])} a year. The standard says 48 hours.",
+        ("Pull failed items", f"{f['fail_sales_items']} Fail items sold in the last {PACE_DAYS} days, about "
+                              f"{money(f['fail_sales'])} a year at that pace. The standard says 48 hours.",
          "ask:Which Fail or Review items are still selling?", "See which items"),
     ]
     fix_html = "".join(f'<div class="fix reveal"><div class="fix-n">{i}</div><h3>{t}</h3><p>{d}</p>'
@@ -119,10 +134,10 @@ def build(f: Figures, plan: dict) -> str:
     <div class="shape s1" data-speed="0.35"></div><div class="shape s2" data-speed="-0.2"></div>
     <div class="shape s3" data-speed="0.6"></div><div class="shape s4" data-speed="0.15"></div>
     <div class="hero-in reveal">
-      <div class="eyebrow">A story in four chapters · made-up data</div>
+      <div class="eyebrow">A story in four chapters · made-up data to {end:%b} {end.day}, {end:%Y}</div>
       <h1>What 30 days of data say about a grocery store.</h1>
-      <p>Three stores, 2,000 products, one month. Every number on this page is worked out two ways before
-      it's shown.</p>
+      <p>Three stores, 2,000 products, one month. Every dollar figure on this page is worked out two ways
+      before it's shown.</p>
       <div class="cue"><span></span>Scroll</div>
     </div>
   </section>
@@ -141,27 +156,23 @@ def build(f: Figures, plan: dict) -> str:
   <section class="band parallax alt">
     <div class="big" data-speed="0.4">02</div><div class="shape b2" data-speed="-0.3"></div>
     <div class="band-in reveal"><div class="kicker">Can you trust these numbers?</div>
-      <h2>Every number is worked out twice.</h2>
-      <p>A second, separately written query has to agree within 0.5% before a number is called verified. Policy
-      answers are quoted from the document, with the section named.</p>
+      <h2>Every answer is checked a second way.</h2>
+      <p>A second, separately written query recomputes each answer's key figures, and they have to agree within
+      0.5% before the answer is called Verified. Policy answers name the section they come from.</p>
       <a href="#" class="cta" data-goto="ask:Which prices fell under the margin floor?">See it on a real question →</a>
     </div>
   </section>
 
   <section class="fixes">
     <div class="fixes-head reveal"><div class="kicker">03 · What to fix first</div>
-      <h2>Three fixes, worth about {money(leak_total)} a year, plus the brand.</h2></div>
+      <h2>Two fixes worth about {money(leak_total)} a year, and one for the brand.</h2></div>
     <div class="fix-grid">{fix_html}</div>
   </section>
 
   <section class="band parallax dark">
     <div class="big" data-speed="0.4">04</div><div class="shape b3" data-speed="-0.25"></div>
     <div class="band-in reveal"><div class="kicker">The next store</div>
-      <h2>A new store {payback_text}, but needs about {_m(plan.get("funding", 0))} of funding before the
-      build starts.</h2>
-      <p>From the planning model: a {plan.get("sqft", 0):,.0f} sq ft store costing about
-      {_m(plan.get("invest", 0))}, with the cash it needs week by week. The board pack puts this month on three
-      slides. Both download below.</p>
+      {next_store}
     </div>
   </section>
 </div>"""

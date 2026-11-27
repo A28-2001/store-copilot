@@ -129,8 +129,8 @@ def load_actuals(db: Path) -> dict:
     try:
         q = lambda sql: con.execute(sql).fetchall()  # noqa: E731
         stores = q("SELECT store_id, name, neighborhood FROM stores ORDER BY store_id")
-        items = {r[0]: r[1:] for r in q(f"""SELECT store_id, SUM(revenue), SUM(cogs) FROM sales_daily
-                                            WHERE sale_date > {since} GROUP BY store_id""")}
+        items = {r[0]: r[1:] for r in q(f"""SELECT store_id, SUM(revenue), SUM(cogs), SUM(revenue - cogs)
+                                            FROM sales_daily WHERE sale_date > {since} GROUP BY store_id""")}
         tx = {r[0]: r[1:] for r in q(f"""SELECT store_id, COUNT(*), SUM(revenue), SUM(transactions)
                                          FROM transactions_daily WHERE sale_date > {since} GROUP BY store_id""")}
         waste = dict(q(f"SELECT store_id, SUM(waste_cost) FROM waste_daily WHERE waste_date > {since} GROUP BY store_id"))
@@ -139,7 +139,7 @@ def load_actuals(db: Path) -> dict:
                                    GROUP BY i.store_id"""))
         targets = q("SELECT category, target_margin_pct / 100.0 FROM category_targets ORDER BY rowid")
         cats = {r[0]: r[1:] for r in q(f"""SELECT COALESCE(m.category, '{UNMAPPED}'), SUM(sd.revenue), SUM(sd.cogs),
-                                                  SUM(sd.units)
+                                                  SUM(sd.units), SUM(sd.revenue - sd.cogs)
                                            FROM sales_daily sd LEFT JOIN sku_master m
                                              ON m.master_sku_id = sd.master_sku_id
                                            WHERE sd.sale_date > {since} GROUP BY 1""")}
@@ -177,18 +177,19 @@ def load_actuals(db: Path) -> dict:
     store_rows = []
     for sid, sname, hood in stores:
         days, tx_rev, n_tx = tx[sid]
-        rev, cogs = items[sid]
+        rev, cogs, gp = items[sid]
         label = f"{sname} ({hood.replace(' (hypothetical)', ', hypothetical')})"
-        store_rows.append(dict(id=sid, label=label, days=days, rev=rev, tx_rev=tx_rev, cogs=cogs, tx=n_tx,
+        store_rows.append(dict(id=sid, label=label, days=days, rev=rev, tx_rev=tx_rev, cogs=cogs, gp=gp, tx=n_tx,
                                waste=waste.get(sid, 0.0), stock=stock_by_store.get(sid, 0.0)))
     cat_rows = []
     for c, t in targets:
         st = stock.get(c, (0.0, 0.0, 0, 0))
-        cat_rows.append(dict(name=c, target=t, rev=cats[c][0], cogs=cats[c][1], units=cats[c][2], stock=st[0],
+        cat_rows.append(dict(name=c, target=t, rev=cats[c][0], cogs=cats[c][1], units=cats[c][2], gp=cats[c][3],
+                             stock=st[0],
                              slow=st[1], slow_skus=st[2], stockouts=st[3], shelf=shelf[c]))
     if UNMAPPED in cats:
         cat_rows.append(dict(name=UNMAPPED, target=None, rev=cats[UNMAPPED][0], cogs=cats[UNMAPPED][1],
-                             units=cats[UNMAPPED][2], stock=None))
+                             units=cats[UNMAPPED][2], gp=cats[UNMAPPED][3], stock=None))
 
     # Vendor payment terms: "Net 30" is paid about 4 weeks after delivery.
     term_rows = []
@@ -210,6 +211,7 @@ def load_actuals(db: Path) -> dict:
     tie("sales, stores vs POS transactions", by_store, sum(s["tx_rev"] for s in store_rows))
     tie("sales, stores vs categories", by_store, sum(c["rev"] for c in cat_rows))
     tie("cost of goods, stores vs categories", sum(s["cogs"] for s in store_rows), sum(c["cogs"] for c in cat_rows))
+    tie("gross profit, stores vs categories", sum(s["gp"] for s in store_rows), sum(c["gp"] for c in cat_rows))
     tie("cost of goods, stores vs payment terms", sum(s["cogs"] for s in store_rows), sum(t["cogs"] for t in term_rows))
     tie("stock, stores vs categories", sum(s["stock"] for s in store_rows), sum(c["stock"] or 0 for c in cat_rows))
     return dict(stores=store_rows, cats=cat_rows, weeks=weeks, terms=term_rows, end=end)
@@ -224,10 +226,10 @@ def build_data(wb, ws, a):
     put(ws, "B3", DAYS, "in", NUM)
     name(wb, "days_window", ws.title, "B3")
 
-    section(ws, 5, "By store", 14)
+    section(ws, 5, "By store", 15)
     headers(ws, 6, ["Store", "Days open", "Sales, item lines", "Sales, POS transactions", "Cost of goods",
                     "Gross margin", "Transactions", "Average basket", "Waste cost", "Waste, % of sales",
-                    "Sales per open day", "Annual run-rate", "Stock at cost"])
+                    "Sales per open day", "Annual run-rate", "Stock at cost", "Gross profit, items with a cost"])
     r0 = 7
     for i, s in enumerate(a["stores"]):
         r = r0 + i
@@ -236,7 +238,7 @@ def build_data(wb, ws, a):
         put(ws, f"C{r}", round(s["rev"], 2), "in", USD)
         put(ws, f"D{r}", round(s["tx_rev"], 2), "in", USD)
         put(ws, f"E{r}", round(s["cogs"], 2), "in", USD)
-        put(ws, f"F{r}", f"=IF(C{r}=0,0,(C{r}-E{r})/C{r})", "f", PCT)
+        put(ws, f"F{r}", f"=IF(C{r}=0,0,N{r}/C{r})", "f", PCT)
         put(ws, f"G{r}", s["tx"], "in", NUM)
         put(ws, f"H{r}", f"=IF(G{r}=0,0,C{r}/G{r})", "f", USD2)
         put(ws, f"I{r}", round(s["waste"], 2), "in", USD)
@@ -244,17 +246,19 @@ def build_data(wb, ws, a):
         put(ws, f"K{r}", f"=IF(B{r}=0,0,C{r}/B{r})", "f", USD)
         put(ws, f"L{r}", f"=K{r}*365", "f", USD)
         put(ws, f"M{r}", round(s["stock"], 2), "in", USD)
+        put(ws, f"N{r}", round(s["gp"], 2), "in", USD)
     rt = r0 + len(a["stores"])
     put(ws, f"A{rt}", "Total", "text", bold=True)
-    for c in "CDEGIKLM":
+    for c in "CDEGIKLMN":
         put(ws, f"{c}{rt}", f"=SUM({c}{r0}:{c}{rt - 1})", "f", NUM if c == "G" else USD, bold=True)
-    put(ws, f"F{rt}", f"=IF(C{rt}=0,0,(C{rt}-E{rt})/C{rt})", "f", PCT, bold=True)
+    put(ws, f"F{rt}", f"=IF(C{rt}=0,0,N{rt}/C{rt})", "f", PCT, bold=True)
     put(ws, f"H{rt}", f"=IF(G{rt}=0,0,C{rt}/G{rt})", "f", USD2, bold=True)
     put(ws, f"J{rt}", f"=IF(C{rt}=0,0,I{rt}/C{rt})", "f", PCT, bold=True)
-    rule(ws, rt, 13)
+    rule(ws, rt, 14)
     newest = a["stores"][-1]
     put(ws, f"A{rt + 1}", f"{newest['label'].split(' (')[0]} opened recently: {newest['days']} days in the window, "
-                          "so its run-rate understates a full year.", "note")
+                          "so its run-rate understates a full year. Gross margin = gross profit / sales; items with "
+                          "no cost on file count as sales with no margin, the same as in the app.", "note")
     row_of = {s["id"]: r0 + i for i, s in enumerate(a["stores"])}
     name(wb, "s1_per_day", ws.title, f"K{row_of['S1']}")
     name(wb, "s3_per_day", ws.title, f"K{row_of['S3']}")
@@ -264,10 +268,11 @@ def build_data(wb, ws, a):
     name(wb, "waste_actual", ws.title, f"J{rt}")
 
     cs = rt + 3
-    section(ws, cs, "By category", 14)
+    section(ws, cs, "By category", 15)
     headers(ws, cs + 1, ["Category", "Sales", "Cost of goods", "Units", "Gross margin", "Target margin",
                          "Average price", "Average unit cost", "Units per week", "Stock at cost",
-                         "Slow stock at cost", "Slow SKUs", "Stock-outs", "Average shelf life (days)"])
+                         "Slow stock at cost", "Slow SKUs", "Stock-outs", "Average shelf life (days)",
+                         "Gross profit, items with a cost"])
     c0 = cs + 2
     for i, c in enumerate(a["cats"]):
         r = c0 + i
@@ -275,9 +280,10 @@ def build_data(wb, ws, a):
         put(ws, f"B{r}", round(c["rev"], 2), "in", USD)
         put(ws, f"C{r}", round(c["cogs"], 2), "in", USD)
         put(ws, f"D{r}", c["units"], "in", NUM)
-        put(ws, f"E{r}", f"=IF(B{r}=0,0,(B{r}-C{r})/B{r})", "f", PCT)
+        put(ws, f"E{r}", f"=IF(B{r}=0,0,O{r}/B{r})", "f", PCT)
+        put(ws, f"O{r}", round(c["gp"], 2), "in", USD)
         put(ws, f"G{r}", f"=IF(D{r}=0,0,B{r}/D{r})", "f", USD2)
-        put(ws, f"H{r}", f"=IF(D{r}=0,0,C{r}/D{r})", "f", USD2)
+        put(ws, f"H{r}", f"=IF(D{r}=0,0,(B{r}-O{r})/D{r})", "f", USD2)  # no-cost items at their price
         put(ws, f"I{r}", f"=D{r}/days_window*7", "f", NUM)
         if c["target"] is not None:
             put(ws, f"F{r}", c["target"], "in", PCT)
@@ -288,10 +294,10 @@ def build_data(wb, ws, a):
             put(ws, f"N{r}", round(c["shelf"], 1), "in", ONE)
     ct = c0 + len(a["cats"])
     put(ws, f"A{ct}", "Total", "text", bold=True)
-    for c in "BCDJKLM":
+    for c in "BCDJKLMO":
         put(ws, f"{c}{ct}", f"=SUM({c}{c0}:{c}{ct - 1})", "f", NUM if c in "DLM" else USD, bold=True)
-    put(ws, f"E{ct}", f"=IF(B{ct}=0,0,(B{ct}-C{ct})/B{ct})", "f", PCT, bold=True)
-    rule(ws, ct, 14)
+    put(ws, f"E{ct}", f"=IF(B{ct}=0,0,O{ct}/B{ct})", "f", PCT, bold=True)
+    rule(ws, ct, 15)
     put(ws, f"A{ct + 1}", f"Slow stock: more than {SLOW_DAYS} days of stock on hand, or no sales in {DAYS} days. "
                           "Cafe and hot bar items are made fresh each day, so they hold no stock.", "note")
     n_named = sum(1 for c in a["cats"] if c["target"] is not None)
@@ -332,7 +338,7 @@ def build_data(wb, ws, a):
     put(ws, f"A{tt + 1}", "Net 30 means the vendor is paid about 4 weeks after delivery. Records with no terms, "
                           "and sales on unmapped POS codes, are assumed to be 4 weeks.", "note")
 
-    widths(ws, {"A": 40, **{L(i): 14 for i in range(2, 15)}})
+    widths(ws, {"A": 40, **{L(i): 14 for i in range(2, 16)}})
     for r in (6, cs + 1):
         ws.row_dimensions[r].height = 30
     stocked_rows = [c0 + i for i, c in enumerate(a["cats"]) if c.get("stock")]
@@ -645,7 +651,7 @@ def build_inventory(wb, ws, d):
         put(ws, f"C{r}", f"=Data!C{src}", "link", USD)
         put(ws, f"D{r}", f"=IF(C{r}=0,0,B{r}/(C{r}/days_window))", "f", ONE)
         put(ws, f"E{r}", f"=IF(D{r}=0,0,365/D{r})", "f", ONE)
-        put(ws, f"F{r}", f"=IF(B{r}=0,0,(Data!B{src}-Data!C{src})*365/days_window/B{r})", "f", USD2)
+        put(ws, f"F{r}", f"=IF(B{r}=0,0,Data!O{src}*365/days_window/B{r})", "f", USD2)
         put(ws, f"G{r}", f"=Data!N{src}", "link", ONE)
         put(ws, f"H{r}", f'=IF(D{r}>G{r},"More stock than it can sell in time","OK")', "f")
         put(ws, f"I{r}", f"=Data!K{src}", "link", USD)
@@ -672,9 +678,11 @@ def build_inventory(wb, ws, d):
         put(ws, f"A{5 + i}", label, "text")
         put(ws, f"B{5 + i}", formula, "f", fmt, bold=True)
         name(wb, nm, ws.title, f"B{5 + i}")
-    put(ws, f"A{rt + 2}", "Most slow stock is in", "text")
+    put(ws, f"A{rt + 2}", "Largest share of slow stock", "text")
     put(ws, f"B{rt + 2}", f"=INDEX(A{r0}:A{rt - 1},MATCH(MAX(I{r0}:I{rt - 1}),I{r0}:I{rt - 1},0))", "f", bold=True)
+    put(ws, f"C{rt + 2}", f"=IF(I{rt}=0,0,MAX(I{r0}:I{rt - 1})/I{rt})", "f", PCT0, bold=True)
     name(wb, "slow_top", ws.title, f"B{rt + 2}")
+    name(wb, "slow_top_share", ws.title, f"C{rt + 2}")
     put(ws, f"A{rt + 4}", f"Slow stock: more than {SLOW_DAYS} days on hand, or no sales in 30 days. Days of stock = "
                           "stock divided by one day's cost of goods. Turns a year = 365 divided by days of stock. "
                           "Cafe and hot bar items are made fresh each day and hold no stock, so they are left out.", "note")
@@ -766,7 +774,7 @@ def build_pricing(wb, ws, d):
 # ----------------------------------------------------------------------------- Checks (on the Data tab)
 def build_checks(wb, ws, d, ns, cash, inv):
     top = d["checks_at"]
-    section(ws, top, "Checks: each one works a number out a second way", 14)
+    section(ws, top, "Checks: the first group works a number out a second way, the second checks the inputs", 14)
     headers(ws, top + 1, ["Check", "Value", "Worked out again", "Difference", "Status"])
     st, ct, tt = d["store_total"], d["cat_total"], d["term_total"]
     R, end = ns["R"], L(ns["last_col"])
@@ -776,6 +784,7 @@ def build_checks(wb, ws, d, ns, cash, inv):
         ("Sales: item lines tie to POS transactions", f"=C{st}", f"=D{st}", USD),
         ("Sales: categories tie to stores", f"=B{ct}", f"=C{st}", USD),
         ("Cost of goods: categories tie to stores", f"=C{ct}", f"=E{st}", USD),
+        ("Gross profit: categories tie to stores", f"=O{ct}", f"=N{st}", USD),
         ("Cost of goods: payment terms cover every vendor", f"=C{tt}", f"=E{st}", USD),
         ("Stock: categories tie to stores", f"=J{ct}", f"=M{st}", USD),
         ("New store: 60 months tie to the 5 yearly totals", f"=SUM({profit})",
@@ -924,8 +933,8 @@ def build_summary(wb, ws, ns, cash, inv):
         'in week "&build_start&" needs about "&TEXT(cash_funding,"$#,##0")&" of outside funding to keep "'
         '&TEXT(cash_cushion,"$#,##0")&" in the bank.","The build starting in week "&build_start&" can be paid from '
         'cash, staying above the "&TEXT(cash_cushion,"$#,##0")&" cushion."))',
-        '=TEXT(slow_total,"$#,##0")&" of stock is slow, "&TEXT(slow_share,"0%")&" of everything on the shelf. Most of '
-        'it is in "&slow_top&"."',
+        '=TEXT(slow_total,"$#,##0")&" of stock is slow, "&TEXT(slow_share,"0%")&" of everything on the shelf. The '
+        'largest share ("&TEXT(slow_top_share,"0%")&") is in "&slow_top&"."',
         '="Changing "&category&" prices by "&TEXT(price_change,"+0%;-0%")&" changes gross profit by "'
         '&TEXT(price_gp_year,"$#,##0;-$#,##0")&" a year."',
     ]

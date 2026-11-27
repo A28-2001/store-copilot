@@ -1,6 +1,6 @@
 # Store Copilot
 
-**A grocery store manager asks a question in plain English and gets back a number that has been double-checked, or the exact policy it came from.**
+**A grocery store manager asks a question in plain English and gets back a number that a second query has checked, or the policy section it came from.**
 
 **[▶ Open the live demo](https://store-copilot-demo.streamlit.app/)** &nbsp;·&nbsp; [Planning model (Excel)](https://github.com/A28-2001/store-copilot/raw/main/planning/store_planning_model.xlsx) &nbsp;·&nbsp; [2-minute tour](#a-2-minute-tour) &nbsp;·&nbsp; [Skills](#skills-this-project-demonstrates) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
 
@@ -11,8 +11,8 @@
 ## Why it matters
 
 - **It catches master data problems before they cost money:** prices keyed below cost, vendor cost increases nobody repriced, items set up without a cost, POS codes that don't map, and app prices that drifted from the POS.
-- **Every number is checked before it's shown.** A second, independently written query must agree before an answer is labelled Verified. If it doesn't, the answer says so.
-- **Policies are quoted, not paraphrased.** SOPs and vendor agreements come back with the section cited.
+- **Every answer is checked before it's labelled Verified.** A second, independently written query recomputes its key figures and must agree. If it doesn't, the answer says so.
+- **Policy answers show their source.** SOPs and vendor agreements come back with the section cited and its text shown.
 - **It's safe to hand to store managers.** It can't change data, and each manager sees only their own store.
 
 ## Skills this project demonstrates
@@ -23,8 +23,8 @@
 | Keeping the POS and a mobile app catalog in sync | The "POS vs app catalog" check |
 | Executive reporting that leads to a decision | Overview: verified KPIs and a "What needs attention" brief; a [3-slide board pack](#board-pack) built from the data |
 | Excel financial modeling | [Planning model](#planning-model-excel): new store payback, a 13-week cash forecast, inventory, pricing tests, Base / Upside / Downside |
-| SQL | 16 question queries, each with an independent check query ([`templates.py`](copilot/templates.py)) |
-| Python and APIs | Data generator, engine, Groq API, 60 automated tests |
+| SQL | 16 question queries, each with one or more independent check queries ([`templates.py`](copilot/templates.py)) |
+| Python and APIs | Data generator, engine, Groq API, 61 automated tests |
 | Dashboards | Streamlit app, Plotly charts, a scroll story with parallax and a pinned chart, a colorblind-checked palette |
 | AI tools in real workflows | LangChain + LangGraph, retrieval over documents (RAG), built with Claude Code |
 | Data quality and honest measurement | [The verifier](#the-verifier), a 40-question evaluation with every miss reported |
@@ -51,7 +51,7 @@ A store manager types a question. The Copilot decides whether it needs **numbers
 | "What needs fixing in master data?" | Runs a 9-check audit (prices below cost, cost increases nobody repriced, missing costs, POS codes, app catalog drift), **Verified**, each check with the rule it enforces |
 | "Which items are out of sync with the app?" | POS vs membership-app catalog: different prices, missing listings, Fail items still listed |
 | "Which Fail items are still selling?" | SQL → re-checked by a second, independent query → **Verified** table + one-paragraph summary |
-| "What's Palmetto's minimum order?" | Retrieves the vendor agreement section and quotes it, cited `[1]` |
+| "What's Kestrel's minimum order?" | Retrieves the vendor agreement section and answers from it, cited `[1]` |
 | "Which vendors should we order from, and what are their payment terms?" | Both: the order list, then the agreement **for the vendor at the top of that list** |
 | "Delete the duplicate POS codes." | Refused by the first node, before any model sees it |
 | A Store 2 manager asks "How did the flagship do?" | "That data is outside your store access." |
@@ -75,7 +75,7 @@ Most wrong numbers in a grocery business start as wrong master data: a cost that
 
 ![The Master data tab: nine checks, each with its count and the rule it enforces](docs_assets/master_data.png)
 
-Each check is one line of SQL in [`copilot/templates.py`](copilot/templates.py), the whole audit is verified by an independently written query, and the rules come from an illustrative [Item Setup and Master Data SOP](docs/item_setup_master_data_sop.md) the Copilot can also quote.
+Each check is a short SQL query in [`copilot/templates.py`](copilot/templates.py), the audit's total is verified by an independently written query, and the rules come from an illustrative [Item Setup and Master Data SOP](docs/item_setup_master_data_sop.md) the Copilot can also quote.
 
 ## Planning model (Excel)
 
@@ -94,21 +94,21 @@ One switch on the Summary tab moves every tab between Base, Upside and Downside:
 
 | Scenario | New store payback | Funding needed to open it | Lowest cash in 13 weeks |
 |---|---|---|---|
-| Base | 24 months | $0.9M | ($0.7M) |
+| Base | 25 months | $0.9M | ($0.7M) |
 | Upside | 15 months | $0.5M | ($0.3M) |
-| Downside | 53 months | $1.5M | ($1.3M) |
+| Downside | 54 months | $1.5M | ($1.3M) |
 
-The stores are sized as a boutique grocer and cafe, about 4,700 sq ft. Two things the model surfaces. Even a store that pays back in two years can't be paid for from the stores' own cash, so the funding has to be arranged before the build starts. And produce, meat and juices hold more days of stock than their shelf life, which is where the waste comes from.
+The stores are sized as a boutique grocer and cafe: the flagship and the planned store are 4,700 sq ft, Stores 2 and 3 are 3,400 and 2,600. Two things the model surfaces. Even a store that pays back in about two years can't be paid for from the stores' own cash, so the funding has to be arranged before the build starts. And produce, meat and juices hold more days of stock than their average shelf life, which ties up cash in food that may not sell in time. (Most of the waste over target comes from the cafe and hot bar, which hold no stock.)
 
-Sales, cost of goods, waste and stock come from the data; store sizes, labor, rent, opening costs and cash in the bank are assumptions, each with a note. Every number except the pasted actuals is a formula. The actuals are tied out before they're written, 14 checks inside the workbook work key numbers out a second way, and [a test](tests/test_workbook.py) rebuilds the model in Python and matches it in all three scenarios. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
+Sales, cost of goods, waste and stock come from the data; store sizes, labor, rent, opening costs and cash in the bank are assumptions, each with a note. Every number except the pasted actuals is a formula. The actuals are tied out before they're written. Inside the workbook, 15 checks run: 10 work a key number out a second way and 5 check the inputs. [A test](tests/test_workbook.py) rebuilds the model in plain Python and matches the saved Base scenario. [`planning/build_workbook.py`](planning/build_workbook.py) builds the file.
 
 ## Board pack
 
-[`board_pack.pdf`](planning/board_pack.pdf) is three slides, one message each: the month in one slide, margin leaks in dollars, and stock and waste. [`planning/build_board_pack.py`](planning/build_board_pack.py) writes it from the data, so nothing is typed by hand: every number is worked out two ways and the build stops if they disagree. When the month closes, run it again.
+[`board_pack.pdf`](planning/board_pack.pdf) is three slides, one message each: the month in one slide, margin leaks in dollars, and stock and waste. [`planning/build_board_pack.py`](planning/build_board_pack.py) writes it from the data, so nothing is typed by hand: every dollar total, rate and day count is worked out two ways (27 checks) and the build stops if any pair disagrees. The item counts (how many prices, cost increases, Fail items) come from one query each. When the month closes, run it again.
 
 ## Why numbers go to SQL and documents go to retrieval
 
-A number has one right answer that a database can compute exactly. Asking a language model to recall it invites a confident guess. A policy is wording, so the job is to find the right section and quote it with a citation. The router sends each question to the tool built for it, and questions that need both get both.
+A number has one right answer that a database can compute exactly. Asking a language model to recall it invites a confident guess. A policy is wording, so the job is to find the right section and answer from it, with a citation. The router sends each question to the tool built for it, and questions that need both get both.
 
 ## Architecture
 
@@ -142,10 +142,10 @@ flowchart TD
 
 In my [Yardstick](https://a28-2001.github.io/yardstick/) study of LLM-written SQL, 93 of the 104 wrong queries ran without any error. So "the query ran" proves nothing. Here a number is only labelled **Verified** when:
 
-1. **An independent query agrees.** In demo mode, each of the 16 question templates carries a hand-written check query that computes the same thing a different way (julianday instead of `date()`, subqueries instead of joins, raw sales instead of the velocity view). In LLM mode, the model writes a second formulation and `compare_frames` checks that the results match within 0.5%.
+1. **An independent query agrees.** In demo mode, each of the 16 question templates carries hand-written check queries that recompute its key figures a different way (julianday instead of `date()`, subqueries instead of joins, raw sales instead of the velocity view). A key figure is a total, a row count, the top row, or a blended rate: the revenue answer also checks its gross margin, the basket answer its average basket and member share. In LLM mode, the model writes a second formulation and `compare_frames` lines the two results up row by row (by store, product or date when both name their rows the same way) and checks every number within 0.5%. A second query that is the same as the first doesn't count.
 2. **Sanity rules pass:** the result isn't empty; there are no negative units, revenue, stock, cost or cover; there are no missing store, SKU or category keys.
 
-If the checks disagree, the answer says so ("the checks don't agree, treat this number with caution") and the Checks panel shows why. A test plants a silent error (revenue × 2, which runs fine) and asserts it gets flagged.
+If the checks disagree, the answer says so ("the checks don't agree, treat this number with caution") and the Checks panel shows why. Tests plant silent errors that run fine (revenue × 2, and a doubled margin next to the right revenue) and assert they get flagged.
 
 ## Safety, enforced in code
 
@@ -154,14 +154,14 @@ None of this depends on the prompt. A model that ignores its instructions still 
 1. **Read-only file.** SQLite opens with `mode=ro`.
 2. **SQL guard.** `sqlglot` parses the query. It must be exactly one `SELECT`/`WITH`, with no `PRAGMA`, `ATTACH` or DDL/DML, no schema-qualified names, and only allow-listed tables.
 3. **Store scope.** Each connection creates `TEMP VIEW`s that shadow every store-level table with only the user's stores. An SQLite **authorizer** then denies any read of the real tables that doesn't come through those views. That closes bypasses like `main.sales_daily` or a derived view, even if the guard were skipped. The tests do exactly that.
-4. **Budgets.** 5 seconds per query (progress handler) and at most 500 rows.
+4. **Budgets.** 5 seconds per query (progress handler), at most 500 rows, and no single value over 1 MB (so a query can't eat the app's memory).
 5. **Before any LLM call,** requests to delete, update or re-price are refused.
 
 The How it works tab has a **"Try to break it"** box: run an attack as the current role and see which layer stops it.
 
 ## Multi-store by design
 
-Every table carries a `store_id`, and stores are config (`config/stores.yaml`), not code. **Adding store 4 is one entry there.** A store with less than 30 days of history is flagged automatically ("Store 3 has only 19 days of history…"). The flagship-vs-new-store assortment gap is one of the built-in questions.
+Every table carries a `store_id`, and stores are config (`config/stores.yaml`), not code. **Adding store 4 to the app is one entry there** (the planning workbook is laid out for these three). A store with less than 30 days of history is flagged automatically ("Store 3 has only 19 days of history…"). The flagship-vs-new-store assortment gap is one of the built-in questions.
 
 ## What the synthetic business models
 
@@ -182,12 +182,12 @@ The data: 3 stores, 2,000 SKUs, 90 days, about 137K sales rows. It's seeded (`--
 
 40 golden questions ([`eval/golden.yaml`](eval/golden.yaml)), written in everyday phrasing before the first run: 20 numbers questions across the original 13 templates (the 3 master data templates are covered by the tests, not the golden set), 12 policy questions with the expected document section, 4 mixed, and 4 traps (3 write requests, 1 off-topic).
 
-**The headline:** in the latest LLM run, **every answer labelled Verified was correct (18 of 18), and both wrong answers were flagged, not verified.** The verifier leans cautious: 4 correct answers went unverified because the second query failed or disagreed.
+**The headline:** in the latest LLM run, **every answer labelled Verified was correct (18 of 18) under the answer keys as revised after review, and both wrong answers were flagged, not verified.** With the keys as first written, 14 of the 18 passed (see "Answer keys" below). The verifier leans cautious: 4 correct answers went unverified because the second query failed or disagreed.
 
 | Metric | Demo, first run | Demo, after fixes | LLM, first run | LLM, second run |
 |---|---|---|---|---|
 | Routing accuracy | 88% (35/40) | 98% (39/40) | 98% (39/40) | 98% (39/40) |
-| Retrieval hit@3 | 69% (11/16) | 75% (12/16)⁴ | 81% (13/16) | 81% (13/16) |
+| Retrieval hit@3 | 69% (11/16) | 75% (12/16)⁴ | 81% (13/16)⁵ | 81% (13/16)⁵ |
 | Answer accuracy | 83% (20/24)¹ | 100% (24/24)¹ | not measured² | **92% (22/24)**; 75% (18/24) with keys as first written³ |
 | Exact table match (strict) | n/a | n/a | 4% (1/24) | 33% (8/24) |
 | Verification rate | 100% (22/22) | 100% (24/24) | 68% (15/22) | 75% (18/24) |
@@ -196,12 +196,12 @@ The data: 3 stores, 2,000 SKUs, 90 days, about 137K sales rows. It's seeded (`--
 | False refusals | 0 | 0 | 0 | 0 |
 | Median latency | 0.01 s | 0.01 s | 13.7 s | 13.0 s |
 
-¹ Demo mode: the expected template answered. ² The first LLM run only had the strict exact-table grader. ³ See "answer keys" below. ⁴ It was 81% (13/16) before the Item Setup SOP was added: the new document now outranks the right section for "Who reviews new SKUs before they get a price?". Adding a document can shift keyword rankings; I left the regression visible rather than rewording the documents to win it back.
+¹ Demo mode: the expected template answered. ² The first LLM run only had the strict exact-table grader. ³ See "answer keys" below. ⁴ It was 81% (13/16) before the Item Setup SOP was added: the new document now outranks the right section for "Who reviews new SKUs before they get a price?". Adding a document can shift keyword rankings; I left the regression visible rather than rewording the documents to win it back. ⁵ Both modes use the same BM25 search; the LLM runs (Sep 29) came before the Item Setup SOP was added.
 
 How to read this honestly. Every mode was run twice, and **the second runs are optimistic**, because I fixed what the first runs exposed:
 - **Demo mode.** The first run's misses were whole classes of phrasing the keyword router didn't know ("When should…", "per day", "wasting"). I fixed the classes and checked the fixes on a separate [dev set](eval/dev.yaml) (11/12), but I had seen the golden misses. The one demo-mode silent error is instructive: "Plot revenue per day for each store" matched the revenue-by-store template, which verified perfectly. The checks confirm the math, not the reading of the question.
 - **LLM mode, run 1 → run 2.** The first run scored 4% on a strict exact-table grader, and reading its answers showed the grader was mostly at fault. It answered "how much did each store sell?" with exactly the right revenue but without the extra columns the template has. It found the same three below-target categories over 90 days instead of the templates' 30. The spec's 50-row cap made a 271-row list unmatchable. Before run 2, I wrote down the business conventions the templates silently assumed (default time windows, what "duplicate POS code" and "running low" mean) and lifted the row cap.
-- **Answer keys.** A template answers its own question, which isn't always the golden phrasing: "Fail items" is not "Fail and Review items". So each numbers question has an [answer key](eval/answer_keys.yaml): the facts a correct answer must contain, with declared alternatives for genuinely ambiguous wording ("this month" as the last 30 days or month to date). I read all six misses of run 2 by hand. Two were real errors, and both were caught: one returned nothing (not verified) and one tripped the verifier (checks disagree). The other four were valid readings the keys hadn't allowed, such as local-brand share of *all* sales (exactly as the schema defines it) or "how many shoppers are members" answered as a count. I added those readings, marked "added after review", and both gradings are reported.
+- **Answer keys.** A template answers its own question, which isn't always the golden phrasing: "Fail items" is not "Fail and Review items". So each numbers question has an [answer key](eval/answer_keys.yaml): the facts a correct answer must contain, with declared alternatives for genuinely ambiguous wording ("this month" as the last 30 days or month to date). I read all six misses of run 2 by hand. Two were real errors, and both were caught: one returned nothing (not verified) and one tripped the verifier (checks disagree). The other four were valid readings the keys hadn't allowed, such as local-brand share of *all* sales (exactly as the schema defined it then; it now says product revenue, like the Overview tile) or "how many shoppers are members" answered as a count. I added those readings, marked "added after review", and both gradings are reported.
 - **Model mix.** Groq's free tier rate-limited the 120B model mid-run, so 56 of 121 calls in run 2 were answered by the gpt-oss-20b fallback. The numbers above are for that mix.
 - Retrieval misses are real BM25 limits, e.g. "marked down" never matches the word "markdown".
 - Every run, with every question and miss listed, is in [`eval/`](eval/).
@@ -225,13 +225,14 @@ The schema mirrors what a typical grocery POS can export: an item list (→ `sku
 pip install -r requirements.txt && streamlit run streamlit_app.py
 ```
 
-The database builds itself on first run (about a second). It runs in **demo mode** with no key. With a key, the suggestion buttons still answer instantly from the verified question library, and typed questions go to the LLM. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
+The database builds itself on first run (a few seconds), and again whenever the generator or `config/stores.yaml` changes. It runs in **demo mode** with no key. With a key, the suggestion buttons still answer instantly from the verified question library, and typed questions go to the LLM. For **LLM mode**, get a free key at [console.groq.com](https://console.groq.com) and paste it into the sidebar, or put `GROQ_API_KEY = "..."` in `.streamlit/secrets.toml`. The app checks the key before switching modes.
 
 ```bash
-pytest                                  # 60 tests, no key needed (the LLM path uses a fake model)
+pytest                                  # 61 tests, no key needed (the LLM path uses a fake model)
 python eval/run_eval.py --mode demo     # the 40-question evaluation
 python data/generate.py --seed 7        # rebuild the synthetic database
-python planning/build_workbook.py       # rebuild the Excel model (Excel calculates it on open)
+python planning/build_workbook.py       # rebuild the Excel model, then open and save it in Excel or LibreOffice
+                                        # so its results are stored (the Story tab reads them)
 python planning/build_board_pack.py     # rebuild the board pack (.pptx)
 ```
 
@@ -239,20 +240,27 @@ python planning/build_board_pack.py     # rebuild the board pack (.pptx)
 
 ```
 config/stores.yaml     stores are config, not code
-data/generate.py       synthetic data -> data/store.db (git-ignored, built on first run)
+data/generate.py       synthetic data -> data/store.db (git-ignored, built on first run, rebuilt when its sources change)
+data/catalog.py        the made-up brands and products
 docs/                  illustrative policies, SOPs (incl. item setup), vendor agreements (+ archive/ for superseded versions)
+copilot/config.py      store config helpers
 copilot/db.py          read-only, store-scoped DB: sqlglot guard, TEMP VIEW scope, authorizer, budgets
-copilot/templates.py   16 demo questions (incl. the master data audit), each with an independent check query
-copilot/verifier.py    independent-check + sanity rules, compare_frames
+copilot/schema.py      the schema notes the LLM is given
+copilot/templates.py   16 demo questions (incl. the master data audit), each with independent check queries
+copilot/verifier.py    independent checks + sanity rules, compare_frames
 copilot/rag.py         section chunking + BM25 BaseRetriever with version filter and relevance floor
 copilot/engine.py      the LangGraph: screen -> route -> numbers / documents / both / refuse
 copilot/llm.py         ChatGroq with fallback; key resolution and key check
-copilot/figures.py     the month's headline numbers, each worked out two ways (story and board pack)
+copilot/dashboard.py   the Overview tiles and the "What needs attention" brief
+copilot/charts.py      Plotly charts
+copilot/figures.py     the month's headline numbers, worked out two ways (story and board pack)
 copilot/story.py       the Story tab: chapters, parallax, the pinned chart
 streamlit_app.py       the app
 planning/              the Excel planning model, the board pack, and the scripts that build them
 eval/                  golden set, dev set, runner, results
 tests/                 pytest suite
+docs_assets/           README screenshots
+.github/workflows/     keep_awake.yml: opens the demo every hour so it doesn't go to sleep
 ```
 
 ## Build notes

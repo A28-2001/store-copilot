@@ -1,6 +1,6 @@
 # Evaluation: llm mode
 
-Run 2026-09-29 00:28, 40 golden questions asked as the Owner (all stores). LLM mode: openai/gpt-oss-120b on Groq (with fallback). Answer accuracy = the LLM's result contains the headline number the template computes for the same question (0.5% tolerance). Exact table match = compare_frames on the whole table, which penalises different but valid column choices. Model calls: openai/gpt-oss-120b × 65, openai/gpt-oss-20b × 56. Re-graded offline with eval/answer_keys.yaml. Re-graded offline with eval/answer_keys.yaml. Re-graded offline with eval/answer_keys.yaml.
+Run 2026-09-29 00:28, 40 golden questions asked as the Owner (all stores). LLM mode: openai/gpt-oss-120b on Groq (with fallback). Answer accuracy = the LLM's result contains the headline number the template computes for the same question (0.5% tolerance). Exact table match = compare_frames on the whole table, which penalises different but valid column choices. Model calls: openai/gpt-oss-120b × 65, openai/gpt-oss-20b × 56. Re-graded offline with eval/answer_keys.yaml.
 
 | Metric | Value | Detail |
 |---|---|---|
@@ -41,7 +41,7 @@ Run 2026-09-29 00:28, 40 golden questions asked as the Owner (all stores). LLM m
 | d01 | documents | What is the minimum order for Wildroot Wellness Supply? | documents |  | ✅ |
 | d02 | documents | What are Northfield's payment terms? | documents |  | ✅ |
 | d03 | documents | Can we return unopened supplements to Wildroot? | documents |  | ✅ |
-| d04 | documents | What happens if meat from Palmetto arrives warm? | documents |  | ✅ |
+| d04 | documents | What happens if meat from Kestrel arrives warm? | documents |  | ✅ |
 | d05 | documents | When do cold-pressed juices get pulled? | documents |  | ✅ |
 | d06 | documents | When should produce be marked down? | documents |  | ❌ |
 | d07 | documents | What's the markdown limit without approval? | documents |  | ✅ |

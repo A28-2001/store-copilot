@@ -40,6 +40,7 @@ class Template:
     extras: Callable[[pd.DataFrame], dict] | None = None
     needs_comparison_store: bool = False     # assortment gap: flagship vs another store
     summary_one: str = ""                    # used instead of `summary` when there is exactly one row
+    more_checks: tuple[tuple[str, str], ...] = ()  # further (check_sql, check_of) pairs for other key figures
 
 
 def _share(df, part, whole):
@@ -144,6 +145,9 @@ GROUP BY st.store_id
 ORDER BY revenue DESC""",
         check_sql=f"SELECT SUM(revenue) FROM sales_daily WHERE julianday(sale_date) > {SINCE}",
         check_of="sum:revenue",
+        more_checks=((f"""
+SELECT 100.0 * SUM(CASE WHEN cogs IS NOT NULL THEN revenue - cogs END) / SUM(revenue)
+FROM sales_daily WHERE julianday(sale_date) > {SINCE}""", "wavg:gross_margin_pct:revenue"),),
         summary="Over the {period} in {scope}: {lines}. Total ${total[revenue]:,.0f}.",
         row_format="{store} made ${revenue:,.0f} at {gross_margin_pct}% gross margin",
         chart={"type": "bar", "x": "store", "y": "revenue"},
@@ -248,6 +252,11 @@ JOIN stores st ON st.store_id = w.store_id
 ORDER BY waste_pct DESC""",
         check_sql=f"SELECT SUM(waste_cost) FROM waste_daily WHERE julianday(waste_date) > {SINCE}",
         check_of="sum:waste_cost",
+        more_checks=((f"""
+SELECT 100.0 * (SELECT SUM(waste_cost) FROM waste_daily WHERE julianday(waste_date) > {SINCE})
+     / (SELECT SUM(cogs) FROM sales_daily WHERE julianday(sale_date) > {SINCE}
+          AND master_sku_id IN (SELECT master_sku_id FROM sku_master WHERE perishable = 1))""",
+                      "share:waste_cost:perishable_cogs"),),
         summary=("Waste over the {period} in {scope} cost ${total[waste_cost]:,.0f}, {overall}% of perishable cost "
                  "against a target of under 3%. {lines}."),
         row_format="{store} {waste_pct}%",
@@ -337,7 +346,7 @@ SELECT (SELECT COUNT(*) FROM sku_map WHERE master_sku_id IS NULL)
     Template(
         id="local_brands",
         title="Local brand share",
-        keywords=("local brand", "local", "south florida", "emerging brand", "local share", "local vendors",
+        keywords=("local brand", "local", "regional", "emerging brand", "local share", "local vendors",
                   "local products"),
         sql=f"""
 WITH {LAST}
@@ -356,6 +365,12 @@ SELECT SUM(revenue) FROM sales_daily
 WHERE master_sku_id IN (SELECT master_sku_id FROM sku_master WHERE is_local_brand = 1)
   AND julianday(sale_date) > {SINCE}""",
         check_of="sum:local_revenue",
+        more_checks=((f"""
+SELECT 100.0 * SUM(CASE WHEN master_sku_id IN (SELECT master_sku_id FROM sku_master WHERE is_local_brand = 1)
+                        THEN revenue ELSE 0 END) / SUM(revenue)
+FROM sales_daily
+WHERE master_sku_id IN (SELECT master_sku_id FROM sku_master) AND julianday(sale_date) > {SINCE}""",
+                      "share:local_revenue:product_revenue"),),
         summary=("Local brands made ${total[local_revenue]:,.0f} over the {period} in {scope}, {overall}% of product "
                  "revenue. {lines}."),
         row_format="{store} {local_share_pct}%",
@@ -386,6 +401,16 @@ ORDER BY transactions DESC""",
 SELECT SUM(transactions) FROM transactions_daily
 WHERE julianday(sale_date) > julianday((SELECT MAX(sale_date) FROM transactions_daily)) - {days}""",
         check_of="sum:transactions",
+        more_checks=(
+            ("""
+SELECT SUM(revenue) / SUM(transactions) FROM transactions_daily
+WHERE julianday(sale_date) > julianday((SELECT MAX(sale_date) FROM transactions_daily)) - {days}""",
+             "wavg:avg_basket:transactions"),
+            ("""
+SELECT 100.0 * SUM(member_transactions) / SUM(transactions) FROM transactions_daily
+WHERE julianday(sale_date) > julianday((SELECT MAX(sale_date) FROM transactions_daily)) - {days}""",
+             "wavg:member_share_pct:transactions"),
+        ),
         summary=("Over the {period} in {scope}: {total[transactions]:,.0f} transactions, an average basket of "
                  "${basket:,.2f}, and members made {members}% of transactions. {lines}."),
         row_format="{store} ${avg_basket:,.2f} basket, {member_share_pct}% members",
@@ -737,6 +762,11 @@ class Prepared:
     days: int | None
     context: dict = field(default_factory=dict)
     problem: str | None = None  # set when the template can't run for this scope
+    more_checks: list[tuple[str, str]] = field(default_factory=list)
+
+    @property
+    def checks(self) -> list[tuple[str, str]]:
+        return [(self.check_sql, self.template.check_of), *self.more_checks]
 
 
 def prepare(template: Template, question: str, scope: list[str]) -> Prepared:
@@ -753,9 +783,11 @@ def prepare(template: Template, question: str, scope: list[str]) -> Prepared:
             target = target or config.newest_store()
         params.update(flagship=flag, target=target)
         context["target_label"] = config.store_label(target)
-    sql = template.sql.format(**params).strip() if ("{" in template.sql) else template.sql.strip()
-    check = template.check_sql.format(**params).strip() if ("{" in template.check_sql) else template.check_sql.strip()
-    return Prepared(template, sql, check, days, context, problem)
+    def fill(text: str) -> str:
+        return text.format(**params).strip() if "{" in text else text.strip()
+
+    more = [(fill(check_sql), check_of) for check_sql, check_of in template.more_checks]
+    return Prepared(template, fill(template.sql), fill(template.check_sql), days, context, problem, more)
 
 
 def summarize(prepared: Prepared, df: pd.DataFrame) -> str:

@@ -207,11 +207,13 @@ def regrade(path: Path) -> None:
         row["answer_ok"] = bool(df is not None and not df.empty and answer_matches(item["id"], df))
         row["silent_error"] = row["verification"] == "verified" and not row["answer_ok"]
     data["metrics"] = summarize(data["rows"])
-    data["note"] = data.get("note", "") + " Re-graded offline with eval/answer_keys.yaml."
+    regraded = " Re-graded offline with eval/answer_keys.yaml."
+    if regraded not in data.get("note", ""):
+        data["note"] = data.get("note", "") + regraded
     path.write_text(json.dumps(data, indent=2))
     md = path.with_suffix(".md")
     note = md.read_text().split("\n")[2] if md.exists() else ""
-    md.write_text(to_markdown("llm", data["metrics"], data["rows"], note + " Re-graded offline with eval/answer_keys.yaml."))
+    md.write_text(to_markdown("llm", data["metrics"], data["rows"], note if regraded in note else note + regraded))
     for m in data["metrics"]:
         print(f"{m['metric']:20s} {m['value']:>7s}  {m['detail']}")
 
@@ -248,7 +250,7 @@ def main() -> None:
     metrics = summarize(rows)
     run_at = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     note = (f"Run {run_at}, {len(rows)} golden questions asked as the Owner (all stores). "
-            + ("Demo mode: keyword router + 13-question template library, no LLM. "
+            + (f"Demo mode: keyword router + {len(templates.TEMPLATES)}-question template library, no LLM. "
                "Answer accuracy = the matched template is the expected one." if args.mode == "demo" else
                f"LLM mode: {PRIMARY_MODEL} on Groq (with fallback). Answer accuracy = the LLM's result contains the "
                "facts in eval/answer_keys.yaml for one acceptable reading of the question. Exact table match = "

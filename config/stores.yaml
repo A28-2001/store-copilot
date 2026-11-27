@@ -22,19 +22,19 @@ stores:
 
   - store_id: S2
     name: Store 2
-    neighborhood: Coconut Grove (hypothetical)
+    neighborhood: Uptown (hypothetical)
     open_date: 2026-06-20
     size_factor: 0.72
     assortment_share: 0.85
-    aliases: [store 2, store two, s2, coconut grove, the grove, second store]
+    aliases: [store 2, store two, s2, uptown, second store]
 
   - store_id: S3
     name: Store 3
-    neighborhood: Miami Beach (hypothetical)
+    neighborhood: Lakeside (hypothetical)
     open_date: 2026-09-10
     size_factor: 0.55
     assortment_share: 0.70
-    aliases: [store 3, store three, s3, miami beach, newest store, newest location, third store]
+    aliases: [store 3, store three, s3, lakeside, newest store, newest location, third store]
 
 # share = share of the 2,000 SKUs; velocity = base units/day per SKU at the flagship.
 categories:

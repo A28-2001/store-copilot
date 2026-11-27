@@ -25,8 +25,8 @@
     },
     {
       "metric": "Silent-error rate",
-      "value": "58% (strict grader)",
-      "detail": "14 of 24 graded answers were labelled Verified but wrong (judged against the strict exact-table grader, so it overstates silent errors)"
+      "value": "not measured",
+      "detail": "Only the strict exact-table grader existed for this run; against it, 14 of 24 graded answers were labelled Verified but wrong, which overstates silent errors."
     },
     {
       "metric": "Traps handled",
@@ -321,7 +321,7 @@
     {
       "id": "d04",
       "kind": "documents",
-      "question": "What happens if meat from Palmetto arrives warm?",
+      "question": "What happens if meat from Kestrel arrives warm?",
       "expected_route": "documents",
       "route": "documents",
       "latency_ms": 1535,

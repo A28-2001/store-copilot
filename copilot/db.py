@@ -6,7 +6,8 @@ Four layers, each of which works even if the others fail:
 3. Store scope: per connection, a TEMP VIEW with the same name shadows every
    store-level table and keeps only the stores this user may see. An authorizer
    then denies any read of the real table that does not come through that view.
-4. A 5-second time budget and a 500-row cap.
+4. A 5-second time budget, a 500-row cap and a 1 MB cap on any one value, so a
+   query can't eat the app's memory (for example by doubling a string recursively).
 """
 from __future__ import annotations
 
@@ -32,12 +33,13 @@ ALLOWED_TABLES = STORE_TABLES | SHARED_TABLES | VIEWS
 
 MAX_ROWS = 500
 TIME_BUDGET_S = 5.0
+MAX_VALUE_BYTES = 1_000_000
 
 FORBIDDEN_NODES = tuple(getattr(exp, name) for name in (
     "Insert", "Update", "Delete", "Drop", "Create", "Alter", "AlterTable", "Command", "Pragma",
     "Attach", "Detach", "Merge", "TruncateTable", "Transaction", "Commit", "Rollback", "Set", "Use",
 ) if hasattr(exp, name))
-BLOCKED_FUNCTIONS = {"load_extension", "readfile", "writefile", "edit", "fts3_tokenizer"}
+BLOCKED_FUNCTIONS = {"load_extension", "readfile", "writefile", "edit", "fts3_tokenizer", "randomblob", "zeroblob"}
 
 
 class QueryError(Exception):
@@ -79,6 +81,10 @@ def guard_sql(sql: str) -> str:
     for node in tree.walk():
         if isinstance(node, FORBIDDEN_NODES):
             raise QueryRejected("Only read-only SELECT queries are allowed. I can't change data.")
+    for fn in tree.find_all(exp.Func):
+        fname = (fn.name if isinstance(fn, exp.Anonymous) else fn.sql_name()).lower()
+        if fname in BLOCKED_FUNCTIONS:
+            raise QueryRejected(f"The function {fname}() isn't allowed here.")
 
     cte_names = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
     for table in tree.find_all(exp.Table):
@@ -125,6 +131,7 @@ class StoreDB:
     def _connect(self) -> sqlite3.Connection:
         uri = f"file:{quote(str(self.db_path.resolve()))}?mode=ro"
         con = sqlite3.connect(uri, uri=True, check_same_thread=False)
+        con.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_VALUE_BYTES)
         in_list = ", ".join(f"'{s}'" for s in self.stores)  # ids validated against config above
         for table in sorted(STORE_TABLES):
             con.execute(f"CREATE TEMP VIEW {table} AS SELECT * FROM main.{table} WHERE store_id IN ({in_list})")
@@ -170,15 +177,29 @@ class StoreDB:
         finally:
             con.close()
         truncated = len(rows) > self.max_rows
-        df = pd.DataFrame(rows[: self.max_rows], columns=cols)
+        df = pd.DataFrame(rows[: self.max_rows], columns=_unique(cols))
         return QueryResult(sql=sql, df=df, truncated=truncated,
                            elapsed_ms=(time.perf_counter() - t0) * 1000, stores=self.stores)
+
+
+def _unique(cols: list[str]) -> list[str]:
+    """SELECT a.store_id, b.store_id gives two columns with one name; pandas needs them distinct."""
+    out: list[str] = []
+    for c in cols:
+        name, n = c, 1
+        while name in out:
+            n += 1
+            name = f"{c}_{n}"
+        out.append(name)
+    return out
 
 
 def _friendly(err: sqlite3.DatabaseError, budget: float) -> QueryError:
     msg = str(err)
     if "not authorized" in msg or "prohibited" in msg:
         return QueryRejected("That data is outside your store access.")
+    if "too big" in msg:
+        return QueryRejected(f"That query built a value over {MAX_VALUE_BYTES // 1_000_000} MB, so I stopped it.")
     if "interrupted" in msg:
         return QueryRejected(f"That query took longer than {budget:.0f} seconds, so I stopped it.")
     if "readonly" in msg or "read-only" in msg:
